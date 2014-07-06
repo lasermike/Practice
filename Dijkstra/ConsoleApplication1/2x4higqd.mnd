@@ -1,0 +1,47 @@
+﻿using Heaps;
+
+namespace BasicDijkstra
+{
+    class RoboCourier
+    {
+        enum Exit
+        {
+            Top,
+            TopRight,
+            BottomRight,
+            Bottom,
+            BottomLeft,
+            TopLeft
+        }
+
+        class HexNode
+        {
+            HexNode[] exits = new HexNode[6] { null, null, null, null, null, null };
+
+            public
+
+        }
+
+        HexNode start;
+
+        void InitializeMap(string path)
+        {
+
+        }
+
+        public RoboCourier(string[] path)
+        {
+            InitializeMap(path[0]);
+
+        }
+
+        public int FindShortestPath()
+        {
+
+        }
+
+    }
+
+
+
+}
