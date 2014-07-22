@@ -64,11 +64,12 @@ namespace Subsequence
             int[] longest = new int[numNodes];
             longest[0] = 1;
 
-            for (int j = 1; j < numNodes; j++)
+/*            for (int j = 1; j < numNodes; j++)
             {
                 longest[j] = 1 + 
             }
-
+            */
+            return 0;
         }
 
     }
