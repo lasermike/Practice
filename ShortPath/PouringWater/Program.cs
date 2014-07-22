@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Implementation of Algowithms S. Dasgupta, CH Papadimitriou, and UV Vazirani's
+// Exercise 3.8
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,8 +15,10 @@ namespace PouringWater
         static void Main(string[] args)
         {
             Graph graph = new Graph(10, 7, 4);
-            graph.Init(0, 2, 2);
+            graph.Init(0, 7, 4);
             graph.Solve();
+
+            Console.ReadKey();
         }
     }
 
@@ -36,6 +41,7 @@ namespace PouringWater
             {
                 jars[i] = new Jar { capacity = capacities[i], amount = amounts[i] };
             }
+            children = new List<Node>();
         }
     }
 
@@ -52,11 +58,27 @@ namespace PouringWater
             capacities[2] = jar3Capacity;
             startState = null;
         }
+        public void Init(int jar1Start, int jar2Start, int jar3Start)
+        {
+            map = new Dictionary<int, Node>();
+            int[] nodeState = new int[3] { jar1Start, jar2Start, jar3Start };
+            startState = new Node(capacities, nodeState);
+            map.Add(GetKey(nodeState), startState);
+
+            AddBranchStatesSlick(startState, 0);
+
+            Console.WriteLine("Found solution in : added " + map.Count + " nodes");
+        }
 
         public bool Solve()
         {
 
             return false;
+        }
+
+        private int GetKey(int[] amounts)
+        {
+            return GetKey(amounts[0], amounts[1], amounts[2]);
         }
 
         private int GetKey(int amount1, int amount2, int amount3)
@@ -76,16 +98,13 @@ namespace PouringWater
             return node ?? null;
         }
 
-        public void Init(int jar1Start, int jar2Start, int jar3Start)
+        private void PrintPadding(int depth)
         {
-            map = new Dictionary<int, Node>();
-            startState = new Node(capacities, new int[3] { jar1Start, jar2Start, jar3Start });
-            map.Add(GetKey(jar1Start, jar2Start, jar3Start), startState);
-
-            AddBranchStates(startState);
+            for (int i = 0; i < depth; i++)
+                Console.Write(" ");
         }
 
-        private void AddBranchStatesSlick(Node node)
+        private bool AddBranchStatesSlick(Node node, int depth)
         {
             for (int i = 0; i < node.jars.Length; i++)  // try pouring from i jar
             {
@@ -94,22 +113,57 @@ namespace PouringWater
                     if (i == j)
                         continue;  //can't pour into self
 
-                    if (node.jars[i].amount < node.jars[j].capacity)
-                    {
-                        int newPourer = 0;
-                        int newReceiver = node.jars[j].amount + node.jars[i].amount;
-                        if (newj1 > capacities[1])
-                        {
-                            newj0 = newj1 - capacities[1];
-                            newj1 = capacities[1];
-                        }
+                    if (node.jars[i].amount == 0) // does i have any water?
+                        continue;
 
+                    if (node.jars[j].amount == node.jars[j].capacity) // is j full already?
+                        continue;
+
+                    // pour from i to j
+                    int newPourerAmount = 0;
+                    int newReceiverAmount = node.jars[j].amount + node.jars[i].amount;
+                    if (newReceiverAmount > node.jars[j].capacity)
+                    {
+                        newPourerAmount = newReceiverAmount - node.jars[j].capacity; // remaining in pourer
+                        newReceiverAmount = node.jars[j].capacity;
+                    }
+
+                    // Add state node to graph
+                    int[] stateData = new int[node.jars.Length];
+                    for (int k = 0; k < node.jars.Length; k++)
+                        stateData[k] = node.jars[k].amount;
+                    stateData[i] = newPourerAmount;
+                    stateData[j] = newReceiverAmount;
+
+                    PrintPadding(depth);
+                    if ( (i != 0 && newPourerAmount == 2) || (j != 0 && newReceiverAmount == 2) )
+                    {
+                        Console.WriteLine("Found solution!  " + stateData.Print());
+                        return true;
+                    }
+
+                    int key = GetKey(stateData);
+                    Node newNode = FindStateInMap(key);
+                    if (newNode == null)
+                    {
+                        Console.WriteLine("Adding new state " + stateData.Print());
+                        newNode = new Node(capacities, stateData);
+                        map.Add(key, newNode);
+                        node.children.Add(newNode);
+                        if (AddBranchStatesSlick(newNode, depth + 1)) // Undiscovered, so continue to find new branches in state
+                            return true;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Founding existing state " + stateData.Print());
+                        node.children.Add(newNode);
                     }
                 }
             }
+            return false;
         }
 
-        private void AddBranchStates(Node node)
+        /*private void AddBranchStates(Node node)
         {
             if (node.jars[0].amount > 0)
             {
@@ -132,7 +186,18 @@ namespace PouringWater
                     node.children.Add(newNode);                    
                 }
             }
-        }
+        }*/
+    }
 
+    public static class Extensions
+    {
+        public static string Print(this int[] nums)
+        {
+            StringBuilder str = new StringBuilder();
+            foreach (int num in nums)
+                str.Append(num + " ");
+            return str.ToString();
+        }
     }
 }
+
