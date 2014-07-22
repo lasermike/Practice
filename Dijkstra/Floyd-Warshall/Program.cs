@@ -13,13 +13,24 @@ namespace Floyd_Warshall
             TeamBuilder teamBuilder = new TeamBuilder();
 
             string[] paths = {
-                "010",
+/*                "010",
                 "000",
                 "110"
+*/
+/*                "0010",
+                "1000",
+                "1100",
+                "1000"
+ */
+//                "01000","00100","00010","00001","10000"
+                "0110000","1000100","0000001","0010000","0110000","1000010","0001000"
+
                              };
 
-            teamBuilder.specialLocations(paths);
+            int[] retval = teamBuilder.specialLocations(paths);
 
+            Console.WriteLine("reach all: " + retval[0]);
+            Console.WriteLine("reachable all: " + retval[1]);
             Console.ReadKey();
         }
     }
@@ -28,7 +39,7 @@ namespace Floyd_Warshall
     {
         private int[,] adjMatrix;
         int numNodes;
-
+        const int max = 1000;
         public TeamBuilder()
         {
         }
@@ -41,35 +52,86 @@ namespace Floyd_Warshall
             {
                 for (int i = 0; i < numNodes; i++)
                 {
-                    adjMatrix[i, j] = (paths[j][i] == '0') ? 666 : (paths[j][i] - '0');
+                    int input = paths[j][i] - '0';
+                    if (i == j)
+                        adjMatrix[i, j] = 0;
+                    else if (input == 0)
+                        adjMatrix[i, j] = max;
+                    else
+                        adjMatrix[i, j] = input;
 
                 }
             }
 
+            Console.WriteLine("Starting matrix");
             printAdjMatrix();
             Console.WriteLine();
 
             floydWarshall();
 
-            printAdjMatrix();
+            int reachAll = findReachAll();
+            int reachableAll = findReachableAll();
 
-            return new int[2] { 0, 0 };
+            return new int[2] { reachAll, reachableAll };
+        }
+
+        private int findReachAll()
+        {
+            int reachAll = 0;
+            for (int j = 0; j < numNodes; j++)
+            {
+                int i = 0;
+                for (; i < numNodes; i++)
+                {
+                    if (i != j && adjMatrix[i, j] == max)
+                        break;
+                }
+                if (i == numNodes)
+                    reachAll++;
+            }
+            return reachAll;
+        }
+
+        private int findReachableAll()
+        {
+            int reachableAll = 0;
+
+            for (int j = 0; j < numNodes; j++)
+            {
+                int i = 0;
+                for (; i < numNodes; i++)
+                {
+                    if (i != j && adjMatrix[j, i] == max)
+                        break;
+                }
+                if (i == numNodes)
+                    reachableAll++;
+            }
+
+            return reachableAll;
         }
 
         private void floydWarshall()
         {
             for (int k = 0; k < numNodes; k++ )
             {
-                for (int i = 0; i < numNodes; i++)
+                for (int j = 0; j < numNodes; j++)
                 {
-                    for (int j = 0; j < numNodes; j++)
+                    for (int i = 0; i < numNodes; i++)
                     {
-                        adjMatrix[i, j] = Math.Min(adjMatrix[i, j], adjMatrix[i,k] + adjMatrix[k,j]);
-                        //if (adjMatrix[i,j] > adjMatrix[i,k] + adjMatrix[k,j])
-                        //    adjMatrix[i, j] = adjMatrix[i,k] + adjMatrix[k, j];
+                            
+                        //adjMatrix[i, j] = Math.Min(adjMatrix[i, j], adjMatrix[i,k] + adjMatrix[k,j]);
+                        if (adjMatrix[i,j] > adjMatrix[i,k] + adjMatrix[k,j])
+                            adjMatrix[i, j] = adjMatrix[i,k] + adjMatrix[k, j];
                     }
                 }
+
+                Console.WriteLine("Matrix at k="+k);
+                printAdjMatrix();
+                Console.WriteLine();
             }
+
+
         }
 
         private void printAdjMatrix()
@@ -78,7 +140,7 @@ namespace Floyd_Warshall
             {
                 for (int i = 0; i < numNodes; i++)
                 {
-                    if (adjMatrix[i, j] == 666)
+                    if (adjMatrix[i, j] == max)
                         Console.Write("X");
                     else
                         Console.Write(adjMatrix[i,j]);
