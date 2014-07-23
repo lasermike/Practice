@@ -1,4 +1,4 @@
-﻿// Implementation of Algowithms S. Dasgupta, CH Papadimitriou, and UV Vazirani's
+﻿// Implementation of Algorithms S. Dasgupta, CH Papadimitriou, and UV Vazirani's
 // Exercise 3.8
 
 using System;
