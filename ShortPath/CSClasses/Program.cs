@@ -94,23 +94,29 @@ namespace CSClasses
 
         public void Solve()
         {
+            // Prereqs are specified in a reverse graph, so flip the arrows of the DAG before DFS.
             Graph rGraph = this.ReverseGraph();
             rGraph.DFS();
+
+            //The order of the post numbers tells us where the sinks are in the original graph (highest post numbers in the reverse graph)
             ClassNode[] ordered = rGraph.classes.OrderByDescending(item => item.Value.postCount).Select(item => item.Value).ToArray();
             Console.WriteLine(ordered.Print(n => n.postCount.ToString()));
 
-            // Groups
             Console.WriteLine("Groupings");
 
+            // Keep track of classes taken
             Dictionary<string, bool> taken = new Dictionary<string, bool>(ordered.Length);
             int groupNum = 1;
 
+            // Started with the source nodes, walk through the list of nodes checking if prereqs have been take.
             for (int i = 0; i < ordered.Length;i++)
             {
+                // Add the classes that are taken each semester
                 List<string> semester = new List<string>();
                 semester.Add(ordered[i].name);
                 Console.WriteLine(ordered[i].name + "("+groupNum+")");
 
+                // Must be a prettier way of doing this!
                 while (true)
                 {
                     i++;
@@ -124,6 +130,7 @@ namespace CSClasses
                     Console.WriteLine(ordered[i].name + "(" + groupNum + ")");
                 }
 
+                // Add this semester to the taken graph
                 semester.ForEach(cls => taken[cls] = true);
             }
         }
