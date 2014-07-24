@@ -37,7 +37,8 @@ namespace CSClasses
         public string[] prereqs;
         public bool visited = false;
         public int preCount = 0;
-        public int postCount = 0; 
+        public int postCount = 0;
+        public int ccnum = 0; 
 
         public ClassNode(string name, string[] prereqs)
         {
@@ -50,10 +51,13 @@ namespace CSClasses
     {
         private Dictionary<string, ClassNode> classes;
         private int count;
+        private int ccnum;
+
         public Graph() 
         {
             classes = new Dictionary<string, ClassNode>();
-            count = 0;
+            count = 1;
+            ccnum = 0;
         }
 
         public void Add(string className, string[] prereqs)
@@ -62,7 +66,12 @@ namespace CSClasses
             if (classes.TryGetValue(className, out existing))
             {
                 if (existing.prereqs.Length > 0)
-                    Array.Copy(prereqs, existing.prereqs, prereqs.Length);
+                {
+                    string[] newArray = new string[existing.prereqs.Length + prereqs.Length];
+                    existing.prereqs.CopyTo(newArray, 0);
+                    prereqs.CopyTo(newArray, existing.prereqs.Length);
+                    existing.prereqs = newArray;
+                }
                 else
                     existing.prereqs = prereqs;
             }
@@ -87,30 +96,35 @@ namespace CSClasses
         {
             Graph rGraph = this.ReverseGraph();
             rGraph.DFS();
-            ClassNode[] ordered = rGraph.classes.OrderBy(item => item.Value.postCount).Select(item => item.Value).ToArray();
-            Console.WriteLine(ordered.Print());
+            ClassNode[] ordered = rGraph.classes.OrderByDescending(item => item.Value.postCount).Select(item => item.Value).ToArray();
+            Console.WriteLine(ordered.Print(n => n.postCount.ToString()));
 
             // Groups
             Console.WriteLine("Groupings");
+
             Dictionary<string, bool> taken = new Dictionary<string, bool>(ordered.Length);
             int groupNum = 1;
 
             for (int i = 0; i < ordered.Length;i++)
             {
-                taken[ordered[i].name] = true;
+                List<string> semester = new List<string>();
+                semester.Add(ordered[i].name);
                 Console.WriteLine(ordered[i].name + "("+groupNum+")");
 
                 while (true)
                 {
                     i++;
-                    if (i >= ordered.Length || !AllTaken(ordered[i].prereqs, taken))
+                    if (i >= ordered.Length || !AllTaken( classes[ordered[i].name].prereqs, taken))
                     {
                         groupNum++;
                         i--;
                         break;
                     }
+                    semester.Add(ordered[i].name);
                     Console.WriteLine(ordered[i].name + "(" + groupNum + ")");
                 }
+
+                semester.ForEach(cls => taken[cls] = true);
             }
         }
 
@@ -137,6 +151,8 @@ namespace CSClasses
                 if (classes[key].visited)
                     continue;
 
+                this.ccnum++;
+
                 stack.Push(key);
 
                 while (stack.Count > 0)
@@ -147,9 +163,10 @@ namespace CSClasses
                     {
                         classes[current].visited = true;
                         classes[current].preCount = this.count++;
+                        classes[current].ccnum = this.ccnum;
                         foreach (string prereqKey in classes[current].prereqs)
                         {
-                            if (!classes[current].visited)
+                            if (!classes[prereqKey].visited)
                                 stack.Push(prereqKey);
                         }
                     }
@@ -168,11 +185,11 @@ namespace CSClasses
 
     static class ExtensionClass
     {
-        public static string Print(this ClassNode[] nodes)
+        public static string Print(this ClassNode[] nodes, Func<ClassNode, string> f)
         {
             StringBuilder sb = new StringBuilder();
             foreach(var node in nodes)
-                sb.Append(node.name + "("+node.postCount+")\n");
+                sb.Append(node.name + "("+ f(node) +")\n");
             return sb.ToString();
         }
     }
