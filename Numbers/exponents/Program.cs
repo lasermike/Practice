@@ -31,9 +31,9 @@ namespace exponents
             int val = ExponentModulus(a, (int) Math.Floor( b / 2.0f), modulus);
 
             if (b % 2 == 1)
-                return (a * val * val) % 35;
+                return (a * val * val) % modulus;
             else
-                return (val * val) % 35;
+                return (val * val) % modulus;
         }
     }
 }
