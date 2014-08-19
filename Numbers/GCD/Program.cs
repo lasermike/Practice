@@ -30,6 +30,13 @@ namespace GCD
             Console.WriteLine("GCD of "+a+" and "+b+" is: " + retval);
             return retval;
         }
+        private int Euclid(int a, int b)
+        {
+            if (b == 0)
+                return a;
+            return Euclid(b, a % b);
+        }
+
 
         public int ComputeCofficients(int a, int b)
         {
@@ -39,14 +46,7 @@ namespace GCD
 
         }
 
-        public int Euclid(int a, int b)
-        {
-            if (b == 0)
-                return a;
-            return Euclid(b, a % b);
-        }
-
-        public Triple EuclidCoefficients(int a, int b)
+        private Triple EuclidCoefficients(int a, int b)
         {
             if (b == 0)
                 return new Triple(1, 0, a);

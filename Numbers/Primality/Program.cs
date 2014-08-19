@@ -38,7 +38,7 @@ namespace Primality
                     Console.WriteLine(num + " is prime ("+Convert.ToString(num, 2)+")");
                     return num;
                 }
-                else
+                else 
                 {
                     //Console.WriteLine(num + " is not prime");
                 }
