@@ -12,8 +12,12 @@ namespace mergesort
     {
         static void Main(string[] args)
         {
-            //int[] data = new int[] { 4, 3, 2, 1 };
-            int[] data = new int[] { 3, 2, 5, 56, 4, 3, 4, 5, 6, 7, 78, 9, 7, 1 };
+            int[] data = new int[] { 6, 5, 4, 3, 2, 1 };
+            //int[] data = new int[] { 3, 2, 5, 56, 4, 3, 4, 5, 6, 7, 78, 9, 7, 1 };
+
+            foreach (int i in data)
+                Console.Write(i + ", ");
+            Console.WriteLine("");
 
             int[] sorted = Sorter.MergeSort(data);
             foreach (int i in sorted)
@@ -29,7 +33,8 @@ namespace mergesort
         static public int[] MergeSort(int[] data)
         {
             Sorter sorter = new Sorter(data);
-            Bound bounds = sorter._MergeSort(0, data.Length - 1);
+            //Bound bounds = sorter.MergeSortRecursive(new Bound(0, data.Length - 1));
+            Bound bounds = sorter.MergeSortIterative(new Bound(0, data.Length - 1));
             Debug.Assert(bounds.Item1 == 0 && bounds.Item2 == data.Length - 1);
             return data; 
         }
@@ -39,34 +44,96 @@ namespace mergesort
             this.data = data;
         }
 
-        private Bound _MergeSort(int start, int end)
+        private Bound MergeSortIterative(Bound bound)
         {
-            if ( ((end - start) + 1) > 1)
+            Queue<Bound> queue = new Queue<Bound>();
+            for (int i = 0; i < data.Length; i++)
             {
-                int half = start + (int)Math.Floor((double) ((end - start) / 2));
-
-                Bound a = _MergeSort(start, half);
-                Bound b = _MergeSort(half + 1, end);
-                return _Merge(a, b);
+                queue.Enqueue(new Bound(i, i));
             }
-            else
-            { 
-                return new Bound(start, start);
+
+            while (queue.Count > 1)
+            {
+                Bound a = queue.Dequeue();
+
+                if (a.Item2 == bound.Item2)
+                {
+                    queue.Enqueue(a);
+                    continue;
+                }
+
+                Bound b = queue.Dequeue();
+
+                if (a.Item1 > b.Item1)
+                    Debugger.Break();
+
+                if (a.Item2 + 1 != b.Item1)
+                    Debugger.Break();
+
+                MergeIterative(a, b);
+                queue.Enqueue( new Bound(a.Item1, b.Item2));
+            }
+            return queue.Dequeue();
+        }
+
+        private void MergeIterative(Bound left, Bound right)
+        {
+            Bound a = new Bound(left.Item1, left.Item2);
+            Bound b = new Bound(right.Item1, right.Item2);
+
+            while (a.Item1 < b.Item1 && b.Item1 <= b.Item2)
+            {
+                if (data[a.Item1] <= data[b.Item1])
+                {
+                    // Just advance the left array start and continue
+                    a = new Bound(a.Item1 + 1, a.Item2);
+                    b = new Bound(b.Item1, b.Item2);
+                }
+                else
+                {
+                    // We will take from the right side array, but we need to shift the left array's bounds over since we are not taking from that side.
+                    // Cache the item we want
+                    int temp = data[b.Item1];
+
+                    // Shift everything to the right 
+                    for (int i = b.Item1; i > a.Item1; i--)
+                        data[i] = data[i - 1];
+
+                    // Store item we want
+                    data[a.Item1] = temp;
+
+                    a = new Bound(a.Item1 + 1, a.Item2 + 1);
+                    b = new Bound(b.Item1 + 1, b.Item2);
+                }
             }
         }
 
-        private Bound _Merge(Bound left, Bound right)
+        private Bound MergeSortRecursive(Bound bound)
         {
-            if (left.Item2 - left.Item1 < 0)
-                return right;
-            if (right.Item2 - right.Item1 < 0)
-                return left;
+            if (((bound.Item2 - bound.Item1) + 1) > 1)
+            {
+                int half = bound.Item1 + (int)Math.Floor((double)((bound.Item2 - bound.Item1) / 2));
+
+                Bound a = MergeSortRecursive( new Bound(bound.Item1, half) );
+                Bound b = MergeSortRecursive( new Bound(half + 1, bound.Item2) );
+                MergeRecursive(a, b);
+                return bound;
+            }
+            else
+            { 
+                return new Bound(bound.Item1, bound.Item2);
+            }
+        }
+
+        private void MergeRecursive(Bound left, Bound right)
+        {
+            if (left.Item2 - left.Item1 < 0 || right.Item2 - right.Item1 < 0)
+                return ;
 
             if (data[left.Item1] <= data[right.Item1])
             {
                 // Just advance the left array start and continue
-                _Merge(new Bound(left.Item1 + 1, left.Item2), right);
-                return new Bound(left.Item1, right.Item2);
+                MergeRecursive(new Bound(left.Item1 + 1, left.Item2), right);
             }
             else
             {
@@ -81,8 +148,7 @@ namespace mergesort
                 // Store item we want
                 data[left.Item1] = temp;
 
-                _Merge(new Bound(left.Item1 + 1, left.Item2 + 1), new Bound(right.Item1 + 1, right.Item2));
-                return new Bound(left.Item1, right.Item2);
+                MergeRecursive(new Bound(left.Item1 + 1, left.Item2 + 1), new Bound(right.Item1 + 1, right.Item2));
             }
         }
     }
