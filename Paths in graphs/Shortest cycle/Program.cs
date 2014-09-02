@@ -56,6 +56,7 @@ namespace Shortest_cycle
 
             public void AddEdge(char id1, char id2, int length)
             {
+                Console.WriteLine("  edge: " + id1 + " - " + id2 + ": "+length);
                 int index1 = id1 - 'A';
                 int index2 = id2 - 'A';
 
@@ -118,14 +119,14 @@ namespace Shortest_cycle
 
                 private void SiftDown(int index)
                 {
-                    if (dist[data[index]] > dist[data[LeftIndex(index)]])
+                    if (LeftIndex(index) < heapLength - 1 && dist[data[index]] > dist[data[LeftIndex(index)]])
                     {
                         Vertex temp = data[index];
                         data[index] = data[LeftIndex(index)];
                         data[LeftIndex(index)] = temp;
                         SiftDown(LeftIndex(index));
                     }
-                    else if (dist[data[index]] > dist[data[RightIndex(index)]])
+                    else if (RightIndex(index) < heapLength - 1 && dist[data[index]] > dist[data[RightIndex(index)]])
                     {
                         Vertex temp = data[index];
                         data[index] = data[RightIndex(index)];
@@ -136,7 +137,7 @@ namespace Shortest_cycle
 
                 public void SiftUp(Vertex vertex)
                 {
-                    for (int i = 0; i < data.Length; i++)
+                    for (int i = 0; i < heapLength; i++)
                     {
                         if (data[i] == vertex)
                         {
@@ -149,7 +150,7 @@ namespace Shortest_cycle
                  
                 private void SiftUp(int index)
                 {
-                    if (dist[data[index]] < dist[data[Parent(index)]])
+                    if (Parent(index) >= 0 && dist[data[index]] < dist[data[Parent(index)]])
                     {
                         Vertex temp = data[index];
                         data[index] = data[Parent(index)];
@@ -164,6 +165,7 @@ namespace Shortest_cycle
 
 
             }
+
             public int FindShortestCycle(char edgeStart, char edgeEnd)
             {
                 Vertex start = vertices[edgeStart - 'A'];
@@ -200,9 +202,131 @@ namespace Shortest_cycle
 
                 return dist[end];
             }
+
+
+            public bool HasUniqueShortestPath(char edgeStart, char edgeEnd)
+            {
+                Vertex start = vertices[edgeStart - 'A'];
+                Vertex end = vertices[edgeEnd - 'A'];
+
+                Dictionary<Vertex, int> dist = new Dictionary<Vertex, int>(vertices.Length);
+                Dictionary<Vertex, Vertex> prev = new Dictionary<Vertex, Vertex>(vertices.Length);
+                Dictionary<Vertex, bool> dupePath = new Dictionary<Vertex, bool>(vertices.Length);
+
+                foreach (Vertex v in vertices)
+                {
+                    dist.Add(v, int.MaxValue);
+                    dupePath.Add(v, false);
+                    prev.Add(v, v);
+                }
+                dist[start] = 0;
+
+                Heap queue = new Heap(vertices.Length);
+                
+                queue.MakeHeap(vertices, dist);
+
+                while (!queue.IsEmpty())
+                {
+                    Vertex curr = queue.PopMin();
+
+                    foreach (Edge edge in curr.edges.Values)
+                    {
+                        if (dist[edge.item2] > dist[edge.item1] + edge.length)
+                        {
+                            dist[edge.item2]  = dist[edge.item1] + edge.length;
+                            queue.SiftUp(edge.item2);
+                            prev[edge.item2] = edge.item1;
+                        }
+                        else if (dist[edge.item2] == dist[edge.item1] + edge.length)
+                        {
+                            dupePath[edge.item2] = true;
+                        }
+                    }
+
+                }
+
+                if (dist[end] != int.MaxValue)
+                {
+                    Console.WriteLine("Shortest path: ");
+                    Vertex curr = end;
+                    do
+                    {
+                        Console.Write(curr.id + ", ");
+                        curr = prev[curr];
+                    } while (curr != start);
+                    Console.WriteLine();
+
+
+                    // Detect shortest path
+                    curr = end;
+                    while (curr != start)
+                    {
+                        if (dupePath[curr])
+                        {
+                            Console.WriteLine("Dupe path at: " + curr.id);
+                            return false;
+                        }
+                        curr = prev[curr];
+                    }
+
+
+                    return true;
+                }
+
+                return false;
+            }
+
         }
 
         static void Main(string[] args)
+        {
+            //FindShortestCycle();
+            TestForUniqueShortestPath();
+        }
+
+        static void TestForUniqueShortestPath()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                Random rand = new Random();
+                Graph graph = new Graph(6);
+                graph.AddVertex('A');
+                graph.AddVertex('B');
+                graph.AddVertex('C');
+                graph.AddVertex('D');
+                graph.AddVertex('E');
+                graph.AddVertex('F');
+
+                const int maxWeight = 100;
+                graph.AddEdge('A', 'B', rand.Next(maxWeight));
+                graph.AddEdge('A', 'C', rand.Next(maxWeight));
+                graph.AddEdge('B', 'D', rand.Next(maxWeight));
+                graph.AddEdge('C', 'D', rand.Next(maxWeight));
+                graph.AddEdge('C', 'E', rand.Next(maxWeight));
+                graph.AddEdge('D', 'F', rand.Next(maxWeight));
+                graph.AddEdge('E', 'F', rand.Next(maxWeight));
+              
+
+
+                /*
+                graph.AddEdge('A', 'B', 2);
+                graph.AddEdge('A', 'C', 1);
+                graph.AddEdge('B', 'D', 1);
+                graph.AddEdge('C', 'D', 1);
+                graph.AddEdge('C', 'E', 2);
+                graph.AddEdge('D', 'F', 2);
+                graph.AddEdge('E', 'F', 1);
+                */
+
+
+
+                bool hasUniqueShortestPath = graph.HasUniqueShortestPath('A', 'F');
+                Console.WriteLine(hasUniqueShortestPath ? "Graph has unique shortest path" : "Graph does not have unique shortest path");
+            }
+            Console.ReadKey();
+        }
+
+        static void FindShortestCycle()
         {
             Graph graph = new Graph(5);
             graph.AddVertex('A');
@@ -210,16 +334,17 @@ namespace Shortest_cycle
             graph.AddVertex('C');
             graph.AddVertex('D');
             graph.AddVertex('E');
+            graph.AddVertex('F');
 
             graph.AddEdge('A', 'B', 1);
-            graph.AddEdge('A', 'C', 2);
-            graph.AddEdge('A', 'D', 2);
-            graph.AddEdge('B', 'C', 2);
-            graph.AddEdge('C', 'E', 2);
-            graph.AddEdge('D', 'E', 1);
+            graph.AddEdge('A', 'C', 1);
+            graph.AddEdge('B', 'D', 1);
+            graph.AddEdge('C', 'D', 1);
+            graph.AddEdge('C', 'E', 6);
+            graph.AddEdge('D', 'F', 2);
+            graph.AddEdge('E', 'F', 1);
 
-            int shortCycleLen =  graph.FindShortestCycle('A', 'C');
-            Console.WriteLine("Shorted cycle is " + shortCycleLen);
+            Console.WriteLine("Graph has " + graph.FindShortestCycle('A', 'C') + " shortest cycle");
             Console.ReadKey();
         }
     }
