@@ -61,7 +61,8 @@ namespace Shortest_cycle
                 int index2 = id2 - 'A';
 
                 Edge edge = new Edge(vertices[index1], vertices[index2], length);
-                vertices[index1].edges.Add(index2, edge); 
+                vertices[index1].edges.Add(index2, edge);
+                edge = new Edge(vertices[index2], vertices[index1], length);
                 vertices[index2].edges.Add(index1, edge); 
             }
 
@@ -135,6 +136,18 @@ namespace Shortest_cycle
                     }
                 }
 
+                public bool Contains(Vertex vertex)
+                {
+                    for (int i = 0; i < heapLength; i++)
+                    {
+                        if (data[i] == vertex)
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
                 public void SiftUp(Vertex vertex)
                 {
                     for (int i = 0; i < heapLength; i++)
@@ -155,6 +168,7 @@ namespace Shortest_cycle
                         Vertex temp = data[index];
                         data[index] = data[Parent(index)];
                         data[Parent(index)] = temp;
+                        SiftUp(Parent(index));
                     }
                 }
 
@@ -231,15 +245,19 @@ namespace Shortest_cycle
 
                     foreach (Edge edge in curr.edges.Values)
                     {
-                        if (dist[edge.item2] > dist[edge.item1] + edge.length)
+                        Vertex vnext = edge.item1 == curr ? edge.item2 : edge.item1;
+                        if (queue.Contains(vnext))
                         {
-                            dist[edge.item2]  = dist[edge.item1] + edge.length;
-                            queue.SiftUp(edge.item2);
-                            prev[edge.item2] = edge.item1;
-                        }
-                        else if (dist[edge.item2] == dist[edge.item1] + edge.length)
-                        {
-                            dupePath[edge.item2] = true;
+                            if (dist[vnext] > dist[curr] + edge.length)
+                            {
+                                dist[vnext] = dist[curr] + edge.length;
+                                queue.SiftUp(vnext);
+                                prev[vnext] = curr;
+                            }
+                            else if (dist[vnext] == dist[curr] + edge.length)
+                            {
+                                dupePath[vnext] = true;
+                            }
                         }
                     }
 
@@ -286,9 +304,9 @@ namespace Shortest_cycle
 
         static void TestForUniqueShortestPath()
         {
-            for (int i = 0; i < 5; i++)
+            Random rand = new Random(5);
+            for (int i = 0; i < 1; i++)
             {
-                Random rand = new Random();
                 Graph graph = new Graph(6);
                 graph.AddVertex('A');
                 graph.AddVertex('B');
@@ -297,7 +315,7 @@ namespace Shortest_cycle
                 graph.AddVertex('E');
                 graph.AddVertex('F');
 
-                const int maxWeight = 100;
+                const int maxWeight = 3;
                 graph.AddEdge('A', 'B', rand.Next(maxWeight));
                 graph.AddEdge('A', 'C', rand.Next(maxWeight));
                 graph.AddEdge('B', 'D', rand.Next(maxWeight));
