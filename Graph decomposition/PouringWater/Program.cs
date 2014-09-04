@@ -1,5 +1,7 @@
 ﻿// Implementation of Algowithms S. Dasgupta, CH Papadimitriou, and UV Vazirani's
 // Exercise 3.8
+// From 3 jars with the given capacities and starting states, find the the set of operations 
+// needed to leave just 2 units of water in jars #2 and #3.
 
 using System;
 using System.Collections.Generic;
