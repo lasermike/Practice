@@ -64,11 +64,11 @@ namespace mergesort
 
                 Bound b = queue.Dequeue();
 
-                if (a.Item1 > b.Item1)
-                    Debugger.Break();
+                //if (a.Item1 > b.Item1)
+                //    Debugger.Break();
 
-                if (a.Item2 + 1 != b.Item1)
-                    Debugger.Break();
+                //if (a.Item2 + 1 != b.Item1)
+                //    Debugger.Break();
 
                 MergeIterative(a, b);
                 queue.Enqueue( new Bound(a.Item1, b.Item2));

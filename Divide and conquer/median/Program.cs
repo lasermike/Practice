@@ -1,4 +1,5 @@
-﻿using System;
+﻿// Finds the median in an unsorted array
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -88,6 +89,8 @@ namespace median
 
         }
 
+        // Splits an array in two.  All numbers below the pivot are on the left side and all numbers
+        // higher than the pivot will be on the right
         static int Partition(int[] data, int start, int end, int pivotIndex)
         {
             int pivot = data[pivotIndex];

@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Knapsack", "Knapsack\Knapsa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shortest path of given length", "Shortest path of given length\Shortest path of given length.csproj", "{7783EA23-DAE8-4BB6-B5C4-0AE0F1D0D39C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Regexp", "Regexp\Regexp.csproj", "{0543DA99-ED30-4758-991E-112B8E491D7D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{7783EA23-DAE8-4BB6-B5C4-0AE0F1D0D39C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7783EA23-DAE8-4BB6-B5C4-0AE0F1D0D39C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7783EA23-DAE8-4BB6-B5C4-0AE0F1D0D39C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0543DA99-ED30-4758-991E-112B8E491D7D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0543DA99-ED30-4758-991E-112B8E491D7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0543DA99-ED30-4758-991E-112B8E491D7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0543DA99-ED30-4758-991E-112B8E491D7D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
