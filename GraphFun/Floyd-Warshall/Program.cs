@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Finds the nodes that are reachable by all other nodes, and nodes that can be reached from all nodes.
+// Uses Floyd-Warshall algorithm to compute shortest path between all pairs of nodes
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -75,6 +78,10 @@ namespace Floyd_Warshall
             return new int[2] { reachAll, reachableAll };
         }
 
+        /// <summary>
+        /// Determine the number of nodes that can reach all other nodes
+        /// </summary>
+        /// <returns></returns>
         private int findReachAll()
         {
             int reachAll = 0;
@@ -92,6 +99,10 @@ namespace Floyd_Warshall
             return reachAll;
         }
 
+        /// <summary>
+        /// Determine the number of nodes that are reachable by all other nodes
+        /// </summary>
+        /// <returns></returns>
         private int findReachableAll()
         {
             int reachableAll = 0;
@@ -111,6 +122,9 @@ namespace Floyd_Warshall
             return reachableAll;
         }
 
+        /// <summary>
+        /// For each pair of nodes start and end, iteratively find a path through all other nodes between start and end
+        /// </summary>
         private void floydWarshall()
         {
             for (int k = 0; k < numNodes; k++ )
@@ -119,7 +133,6 @@ namespace Floyd_Warshall
                 {
                     for (int i = 0; i < numNodes; i++)
                     {
-                            
                         //adjMatrix[i, j] = Math.Min(adjMatrix[i, j], adjMatrix[i,k] + adjMatrix[k,j]);
                         if (adjMatrix[i,j] > adjMatrix[i,k] + adjMatrix[k,j])
                             adjMatrix[i, j] = adjMatrix[i,k] + adjMatrix[k, j];

@@ -14,13 +14,8 @@ namespace Regexp
             // Supported special chars
             // *   .    /d    
 
-            Reg reg = new Reg();
-
-            bool match = reg.Eval(@"\d*_..\d\d", "_xy45");
-            Check(match, true, reg.stream, reg.pattern);
-
-            match = reg.Eval(@"\d*_..\d\d", "123_xy45");
-            Check(match, true, reg.stream, reg.pattern);
+            Reg reg = new Reg(AlgorithmType.Recursive);
+            bool match;
 
             match = reg.Eval(@"\d\d\d-\d\d\d-\d\d\d\d", "206-111-2222");
             Check(match, true, reg.stream, reg.pattern);
@@ -29,6 +24,15 @@ namespace Regexp
             Check(match, false, reg.stream, reg.pattern);
 
             match = reg.Eval(@"\d\d\d-\d*-\d.\d\d", "206-111-2222");
+            Check(match, true, reg.stream, reg.pattern);
+
+            match = reg.Eval(@"\d*_..\d\d", "123_xy45");
+            Check(match, true, reg.stream, reg.pattern);
+
+            match = reg.Eval(@"\d*_..\d\d", "_xy45");
+            Check(match, true, reg.stream, reg.pattern);
+
+            match = reg.Eval(@"\dxyz\d*", "1xyz");
             Check(match, true, reg.stream, reg.pattern);
 
 
@@ -43,6 +47,12 @@ namespace Regexp
                 throw new Exception(text);
         }
 
+        enum AlgorithmType
+        {
+            Dynamic,
+            Recursive
+        };
+
         /// <summary>
         /// Evaluates simple regular expressions
         /// </summary>
@@ -51,8 +61,9 @@ namespace Regexp
             // Cached for easy display at the end
             public string stream;
             public string pattern;
+            private AlgorithmType algorithmType;
 
-            public Reg() { }
+            public Reg(AlgorithmType algorithmType) { this.algorithmType = algorithmType; }
 
             /// <summary>
             /// Types of elements that can be matched
@@ -65,6 +76,50 @@ namespace Regexp
 
                 MatchNode[] format = MatchNode.Generate(exp);
 
+                if (algorithmType == AlgorithmType.Recursive)
+                    return EvalRecursive(format, str);
+                else
+                    return EvalDynamic(format, str);
+            }
+
+            private bool EvalRecursive(MatchNode[] format, string str)
+            {
+                if (str.Length == 0 && format.Length == 0)
+                    return true;
+
+                // Handle case of 'repeat zero or more times element' at the end of the format string
+                if (str.Length == 0 && format[0].repeated)
+                {
+                    return EvalRecursive(format.Skip(1).ToArray(), str);
+                }
+
+                // Does the current first character match the current first pattern element?
+                if (str.Length > 0 && format.Length > 0)
+                {
+                    if (DoesCharacterMatch(str[0], format[0]))
+                    {
+                        // Check next character with next pattern element
+                        if (EvalRecursive(format.Skip(1).ToArray(), str.Substring(1).ToString()))
+                            return true;
+
+                        if (format[0].repeated)
+                        {
+                            // Check next character with the current pattern element
+                            if (EvalRecursive(format, str.Substring(1).ToString()))
+                                return true;
+                        }
+                    }
+                    else if (format[0].repeated)
+                    {
+                        // Repeated can be zero matches, so try just advancing the pattern
+                        return EvalRecursive(format.Skip(1).ToArray(), str);
+                    }
+                }
+                return false;
+            }
+
+            private bool EvalDynamic(MatchNode[] format, string str)
+            {
                 // Initial the match table.  We only need to init the left and top edge because we fill in the rest dynamically
                 bool[,] match = new bool[str.Length + 1, format.Length + 1];
                 for (int i = 0; i < str.Length + 1; i++)
@@ -78,11 +133,11 @@ namespace Regexp
                     for (int i = 1; i < str.Length + 1; i++)
                     {
                         // Is there a direct or '.' character match?
-                        if (match[i - 1, j - 1] && Diff(str[i - 1], format[j - 1]))
+                        if (match[i - 1, j - 1] && DoesCharacterMatch(str[i - 1], format[j - 1]))
                             match[i , j] = true;
 
                         // Did the previous character match, and it is a repeating pattern, and the current character also matches it?
-                        if (match[i - 1, j] && Diff(str[i - 1], format[j - 1]) && format[j - 1].repeated)
+                        if (match[i - 1, j] && DoesCharacterMatch(str[i - 1], format[j - 1]) && format[j - 1].repeated)
                             match[i, j] = true;
 
                         // Handle case were '*' matches zero elements
@@ -115,7 +170,7 @@ namespace Regexp
             /// <summary>
             /// Determines if the given character matches the given node
             /// </summary>
-            private bool Diff(char character, MatchNode matchClass) 
+            private bool DoesCharacterMatch(char character, MatchNode matchClass) 
             {
                 switch (matchClass.type)
                 {
