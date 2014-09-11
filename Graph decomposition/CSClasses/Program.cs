@@ -16,7 +16,8 @@ namespace CSClasses
             graph.Add("CS101", new string[] { });
             graph.Add("CS102", new string[] {  });
             graph.Add("CS103", new string[] { });
-            graph.Add("CS201", new string[] { "CS101" });
+            graph.Add("CS108", new string[] { });
+            graph.Add("CS201", new string[] { "CS101", "CS108" });
             graph.Add("CS202", new string[] { "CS102", "CS201" });
             graph.Add("CS203", new string[] { "CS103", "CS202" });
             graph.Add("CS301", new string[] { "CS201", "CS203" });
@@ -108,7 +109,7 @@ namespace CSClasses
             Dictionary<string, bool> taken = new Dictionary<string, bool>(ordered.Length);
             int groupNum = 1;
 
-            // Started with the source nodes, walk through the list of nodes checking if prereqs have been take.
+            // Started with the source nodes, walk through the list of nodes checking if prereqs have been taken.
             for (int i = 0; i < ordered.Length;i++)
             {
                 // Add the classes that are taken each semester
