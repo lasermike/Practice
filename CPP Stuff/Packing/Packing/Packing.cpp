@@ -40,6 +40,25 @@ struct Rect
 		return false;
 	}
 
+	bool Equals(Rect rect)
+	{
+		return rect.x1 == x1 && rect.x2 == x2 && rect.y1 == y1 && rect.y2 == y2;
+	}
+
+	void Print()
+	{
+		cout << "(" << x1 << ", " << y1 << ", " << x2 << ", " << y2 << ")";
+	}
+	int Width()
+	{
+		return x2 - x1;
+	}
+
+	int Height()
+	{
+		return y2 - y1;
+	}
+
 	int x1, y1, x2, y2;
 };
 
@@ -65,10 +84,10 @@ public:
 
 	void OutputFree()
 	{
-		std::cout << "Free list\n";
+		cout << "Free list\n";
 		for (list<Rect>::iterator freeRect = freeList.begin(); freeRect != freeList.end(); freeRect++)
 		{
-			std::cout << "  rect(" << freeRect->x1 << ", " << freeRect->y1 << ", " << freeRect->x2 << ", " << freeRect->y2 << ")\n";
+			cout << "  rect(" << freeRect->x1 << ", " << freeRect->y1 << ", " << freeRect->x2 << ", " << freeRect->y2 << ")\n";
 		}
 	}
 
@@ -81,9 +100,12 @@ public:
 		// This case is unnecessary because the later Explore function will cover the same data set
 		for (list<Rect>::iterator freeRect = freeList.begin(); freeRect != freeList.end(); freeRect++)
 		{
-			if (TryCreateSubRect(*freeRect, width, height, newFreeRects))
+			if (TryCreateSubRect(*freeRect, width, height, newRect))
 			{
-				newRect = Rect(freeRect->x1, freeRect->y1, freeRect->x1 + width, freeRect->y1 + height);
+				// Clip all consumed rects by the newly allocated rect
+				Clip(newRect, *freeRect, newFreeRects);
+
+				//newRect = Rect(freeRect->x1, freeRect->y1, freeRect->x1 + width, freeRect->y1 + height);
 				for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
 					freeList.push_back(*newFreeRectIter);
 				freeList.erase(freeRect);
@@ -108,6 +130,18 @@ public:
 		return false;
 	}
 
+	void CheckFree(Rect rect)
+	{
+		for (auto i = freeList.begin(); i != freeList.end(); i++)
+		{
+			if (rect.Equals(*i))
+				return;
+		}
+		cout << "CheckFree: Error rect ";
+		rect.Print();
+		cout << " not found\n";
+	}
+
 private:
 
 	bool EnsureAllIntersect(Rect& largest, ListOfIterators::iterator iterators, int length)
@@ -123,33 +157,149 @@ private:
 		return true;
 	}
 
+	// Clips consumedRect by clipRect, adding intersection to newFreeRects
+	void Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
+	{
+		Rect rect = consumedRect;
+
+		// Case where this rect's height extends above new rect region
+		//  Input X       Output     F
+		//        X                  F
+		//        XYY				 NNN
+		//        X                  R
+		if (rect.y1 < clipRect.y1)
+		{
+			//INCOMPLETE!!
+			Rect newFree = Rect(rect.x1, rect.y1, rect.x2, clipRect.y1 - 1);
+			if (newFree.Width() > 0 && newFree.Height() > 0)
+				newFreeRects.push_back(newFree);
+			rect = Rect(rect.x1, clipRect.y2 + 1, rect.x2, rect.y2); // Remainder
+		}
+
+		if (rect.y2 > clipRect.y2)
+		{
+			// Case where this rect's height extends below and left of clip region
+			//  Input  X       Output     C
+			//         X                  C
+			//        YYY                1C2
+			if (rect.x1 < clipRect.x1)
+			{
+				Rect newFree = Rect(rect.x1, rect.y1, clipRect.x1 - 1, rect.y2);
+				if (newFree.Width() > 0 && newFree.Height() > 0)
+				{
+					newFreeRects.push_back(newFree);
+					rect = Rect(clipRect.x1, clipRect.y2 + 1, rect.x2, rect.y2);  // Remainder
+					if (rect.Width() > 0 && rect.Height() > 0)
+						newFreeRects.push_back(rect);
+				}
+			}
+			else
+			{
+				// Case where this rect's height extends below and right of clip region
+				//  Input         Output      
+				//          Y                 C
+				//          YXX               CX
+				//           XX               CX
+				Rect newFree = Rect(rect.x1, clipRect.y2 + 1, rect.x2, rect.y2);
+				if (newFree.Width() > 0 && newFree.Height() > 0)
+					newFreeRects.push_back(newFree);
+				rect = Rect(clipRect.x2 + 1, rect.y1, rect.x2, newFree.y1 - 1);  // Remainder
+				if (rect.Width() > 0 && rect.Height() > 0)
+					newFreeRects.push_back(rect);
+			}
+			return;
+		}
+
+		if (rect.x1 < clipRect.x1)
+		{
+			// Case where this rect's width extends lower left of clip region
+			//  Input          Largest
+			//          Y                  L
+			//          Y                  L
+			//        XXXX               XXLX
+			if (rect.y1 < clipRect.y1)
+			{
+				Rect newFree = Rect(rect.x1, rect.y1, clipRect.x1 - 1, rect.y2);
+				if (newFree.Width() > 0 && newFree.Height() > 0)
+					newFreeRects.push_back(newFree);
+				rect = Rect(clipRect.x1 + 1, rect.y1, rect.x2, rect.y2);  // Remainder
+				if (rect.Width() > 0 && rect.Height() > 0)
+					newFreeRects.push_back(rect);
+			}
+			else
+			{
+				// Case where this rect's width extends upper left of clip region
+				//  Input   
+				//        XXXX      Largest  XXLX
+				//          Y                  L
+				//          Y                  L
+				Rect newFree = Rect(rect.x1, rect.y1, clipRect.x1 - 1, rect.y2);
+				if (newFree.Width() > 0 && newFree.Height() > 0)
+					newFreeRects.push_back(newFree);
+				rect = Rect(clipRect.x1 + 1, rect.y1, rect.x2, rect.y2);  // Remainder
+				if (rect.Width() > 0 && rect.Height() > 0)
+					newFreeRects.push_back(rect);
+
+			}
+			return;
+		}
+		// Case where this rect's height extends right of largest region
+		//  Input Y       Largest   L
+		//        YXX               LXX
+		//        Y                 L
+		if (rect.x2 > clipRect.x2)
+		{
+			//INCOMPLETE!!
+			Rect newFree = Rect(clipRect.x2 + 1, rect.y1, rect.x2, rect.y2);
+			if (newFree.Width() > 0 && newFree.Height() > 0)
+			{
+				newFreeRects.push_back(newFree);
+				//rect = Rect()
+				if (rect.Width() > 0 && rect.Height() > 0)
+					newFreeRects.push_back(rect);
+			}
+		}
+	}
+
 	bool Explore(ListOfIterators& permutation, int width, int height, int length, list<Rect>::iterator nextFromFreeList, Rect& newRect)
 	{
 		// For each entry in the list of iterators
 		for (ListOfIterators::iterator i = permutation.begin(); i != permutation.end(); i++)
 		{
-			ListOfIterators rectsInPlay;
+			ListOfIterators freeRectsBeingConsumed;
 			Rect largest = *(*i); // First rect in the list
-			if (ComputeHorizCaseDimensions(largest, i, rectsInPlay, length))
+			if (ComputeHorizCaseDimensions(largest, i, freeRectsBeingConsumed, length))
 			{
 				// Try creating rect
 				list<Rect> newFreeRects;
-				if (TryCreateSubRect(largest, width, height, newFreeRects))
+				if (TryCreateSubRect(largest, width, height, newRect))
 				{
-					ListMaintanceAfterCreate(largest, width, height, newRect, newFreeRects, rectsInPlay);
+					// Clip this rect by the largest region rect
+					Rect remainingLargest = largest;
+					for (ListOfIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
+					{
+						// Clip all consumed rects by the newly allocated rect
+						Clip(newRect, *(*i), newFreeRects);
+					}
+					ListMaintanceAfterCreate(largest, width, height, newFreeRects, freeRectsBeingConsumed);
 					return true;
 				}
 			}
 
-			rectsInPlay.clear();
+			freeRectsBeingConsumed.clear();
 			largest = *(*i); // First rect in the list
-			if (ComputeVertCaseDimensions(largest, i, rectsInPlay, length))
+			if (ComputeVertCaseDimensions(largest, i, freeRectsBeingConsumed, length))
 			{
 				// Try creating rect
 				list<Rect> newFreeRects;
-				if (TryCreateSubRect(largest, width, height, newFreeRects))
+				if (TryCreateSubRect(largest, width, height, newRect))
 				{
-					ListMaintanceAfterCreate(largest, width, height, newRect, newFreeRects, rectsInPlay);
+					for (ListOfIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
+					{
+						// Clip all consumed rects by the newly allocated rect
+						Clip(newRect, *(*i), newFreeRects);
+					}
+					ListMaintanceAfterCreate(largest, width, height, newFreeRects, freeRectsBeingConsumed);
 					return true;
 				}
 			}
@@ -185,7 +335,7 @@ private:
 	//  X                             X
 	//  XYYY                       YYYX
 	//  X                             X
-	bool ComputeHorizCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& rectsInPlay, int length)
+	bool ComputeHorizCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length)
 	{
 		int listLen = 0;
 
@@ -196,9 +346,10 @@ private:
 			largest.y1 = max(largest.y1, rect->y1);
 			largest.x2 = max(largest.x2, rect->x2);
 			largest.y2 = min(largest.y2, rect->y2);
-			rectsInPlay.push_back(rect);
+			freeRectsBeingConsumed.push_back(rect);
 		}
 
+		// Note to double check this is actually sufficient to determine if all rectangles were adjacent
 		if (!EnsureAllIntersect(largest, iterators, length))
 			return false;
 
@@ -209,7 +360,7 @@ private:
 	//     X             YYY
 	//     X              X
 	//    YYY             X
-	bool ComputeVertCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& rectsInPlay, int length)
+	bool ComputeVertCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length)
 	{
 		int listLen = 0;
 
@@ -220,7 +371,7 @@ private:
 			largest.y1 = min(largest.y1, rect->y1);
 			largest.x2 = min(largest.x2, rect->x2);
 			largest.y2 = max(largest.y2, rect->y2);
-			rectsInPlay.push_back(rect);
+			freeRectsBeingConsumed.push_back(rect);
 		}
 
 		if (!EnsureAllIntersect(largest, iterators, length))
@@ -229,40 +380,29 @@ private:
 		return true;
 	}
 
-	void ListMaintanceAfterCreate(Rect largest, int width, int height, Rect& newRect, list<Rect> newFreeRects, ListOfIterators& rectsInPlay)
+	void ListMaintanceAfterCreate(Rect largest, int width, int height, list<Rect> newFreeRects, ListOfIterators& freeRectsBeingConsumed)
 	{
-		newRect = Rect(largest.x1, largest.y1, largest.x1 + width, largest.y1 + height);
-
-		// Add 1 or 2 free rects resulting from the chop
+		// Add new clipped free rects resulting from the chop
 		for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
 			freeList.push_back(*newFreeRectIter);
 
 		// Remove rectangles that were chopped
-		for (ListOfIterators::iterator i = rectsInPlay.begin(); i != rectsInPlay.end(); i++)
+		for (ListOfIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
 			freeList.erase(*i);
 	}
 
-	bool TryCreateSubRect(Rect rect, int width, int height, list<Rect>& newFreeRects)
+	bool TryCreateSubRect(Rect largest, int width, int height, Rect& newRect)
 	{
-		if (rect.x2 - rect.x1 >= width && rect.y2 - rect.y1 >= height)
+		if (largest.x2 - largest.x1 >= width && largest.y2 - largest.y1 >= height)
 		{
-			// Allocate a free rect below the newly created rect that extends to the right bound of the original rect
-			if (rect.y1 + height < rect.y2)
-			{
-				newFreeRects.push_back(Rect(rect.x1, rect.y1 + height + 1, rect.x2, rect.y2));
-			}
-
-			// Allocate a free rect to the right of the newly created rect 
-			if (rect.x1 + width < rect.y2)
-			{
-				newFreeRects.push_back(Rect(rect.x1 + width + 1, rect.y1, rect.x2, rect.y1 + height));
-			}
-
+			newRect = Rect(largest.x1, largest.y1, largest.x1 + width, largest.y1 + height);
 			return true;
 		}
 		return false;
 	}
+
 };
+
 
 void GetRect(int width, int height, Packer* packer, list<Rect>& allocated)
 {
@@ -278,18 +418,40 @@ void GetRect(int width, int height, Packer* packer, list<Rect>& allocated)
 	}
 }
 
-int _tmain(int argc, _TCHAR* argv[])
+void Case1()
 {
 	Packer* packer = new Packer(10, 10);
 	list<Rect> allocated;
 
 	GetRect(4, 2, packer, allocated);
-
 	packer->OutputFree();
+	packer->CheckFree(Rect(0, 3, 10, 10));
+	packer->CheckFree(Rect(5, 0, 10, 2));
 
 	GetRect(5, 8, packer, allocated);
-
 	packer->OutputFree();
+	packer->CheckFree(Rect(0, 3, 4, 10));
+	packer->CheckFree(Rect(5, 9, 10, 10));
+	free(packer);
+}
+
+void Case2()
+{
+	Packer* packer = new Packer(10, 10);
+	list<Rect> allocated;
+
+	GetRect(2, 9, packer, allocated);
+	packer->OutputFree();
+	//packer->CheckFree(Rect(9, 0, 10, 2));
+	//packer->CheckFree(Rect(3, 0, 10, 10));
+
+	free(packer);
+}
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+	Case1();
+	Case2();
 
 	char key;
 	std::cin >> key;
