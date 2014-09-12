@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "math.h"
+#include <iostream> 
 #include <algorithm> 
 #include <list>
 using namespace std;
@@ -16,10 +17,7 @@ struct Rect
 
 	Rect(int xa1, int ya1, int xa2, int ya2)
 	{
-		x1 = xa1;
-		y1 = ya1;
-		x2 = xa2;
-		y2 = ya2;
+		x1 = xa1; y1 = ya1; x2 = xa2; y2 = ya2;
 	}
 
 	int x1, y1, x2, y2;
@@ -36,24 +34,32 @@ bool compare_rects(const Rect& first, Rect& second)
 	else return first.x1 < second.x1;
 }
 
+typedef list<list<Rect>::iterator> ListOfIterators;
+
 class Packer
 {
 private:
 	list<Rect> freeList;
+	int freeListLen;
+	int atlasWidth;
+	int atlasHeight;
 
 public:
-	Packer(int atlasWidth, int atlasHeight)
+	Packer(int width, int height)
 	{
+		atlasWidth = width;
+		atlasHeight = height;
 		Rect rect(0, 0, atlasWidth, atlasHeight);
 		freeList.push_back(rect);
-	
 	}
 
 	bool Request(int width, int height, Rect& newRect)
 	{
 		list<Rect> newFreeRects;
+		freeListLen = 0;
 
 		// Loop through free list looking for a single rectangle that fits
+		// This case is unnecessary since the later explore function will cover the same data set
 		for (list<Rect>::iterator freeRect = freeList.begin(); freeRect != freeList.end(); freeRect++)
 		{
 			if (CreateSubRect(*freeRect, width, height, newFreeRects))
@@ -62,73 +68,149 @@ public:
 				for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
 					freeList.push_back(*newFreeRectIter);
 				freeList.erase(freeRect);
-				freeList.sort(compare_rects);
+				//freeList.sort(compare_rects);
 				return true;
 			}
+			freeListLen++;
 		}
 
-		// Now try increasing sized runs of free rectangles looking for a space that fits
-		// Increasing runs rather than all permuations work because we keep the free list sorted 
-		for (list<Rect>::iterator start = freeList.begin(); start != freeList.end(); start++)
+		// Now try all merging all permutations of rectangles to find a fit
+		// Start by exploring each rectangle individually
+		for (list<Rect>::iterator i = freeList.begin(); i != freeList.end(); i++)
 		{
-			int left = start->x1;
-			int top = start->y1;
-			int right = start->x2;
-			int bottom = start->y2;
-
-			list<Rect>::iterator freeRect;
-
-			// Find the largest contiguous horitizonal area
-			for (freeRect = freeList.begin(); freeRect != start; freeRect++)
-			{
-				if (freeRect->x1 == right + 1)
-				{
-					right = freeRect->x2;
-					top = max(top, freeRect->y1);
-					bottom = min(bottom, freeRect->y2);
-				}
-			}
-
-			// Try creating rect
-			if (CreateSubRect(Rect(left, top, right, bottom), width, height, newFreeRects))
-			{
-				newRect = Rect(freeRect->x1, freeRect->y1, freeRect->x1 + width, freeRect->y1 + height);
-				for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
-					freeList.push_back(*newFreeRectIter);
-				freeList.erase(freeRect);
-				freeList.sort(compare_rects);
+			ListOfIterators iterators;
+			iterators.push_back(i);
+			list<Rect>::iterator nextFromFreeList = i;
+			nextFromFreeList++;
+			bool retval = Explore(iterators, width, height, 1, nextFromFreeList);
+			if (retval)
 				return true;
-			}
-
-			left = start->x1;
-			top = start->y1;
-			right = start->x2;
-			bottom = start->y2;
-			// Find the largest contiguous vertical area
-			for (freeRect = freeList.begin(); freeRect != start; freeRect++)
-			{
-				if (freeRect->y1 == bottom + 1)
-				{
-					bottom = freeRect->y2;
-					right = min(right, freeRect->x2);
-					left = max(left, freeRect->x1);
-				}
-			}
-
-			// Try creating rect
-			if (CreateSubRect(Rect(left, top, right, bottom), width, height, newFreeRects))
-			{
-				newRect = Rect(freeRect->x1, freeRect->y1, freeRect->x1 + width, freeRect->y1 + height);
-				for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
-					freeList.push_back(*newFreeRectIter);
-				freeList.erase(freeRect);
-				freeList.sort(compare_rects);
-				return true;
-			}
-
 		}
 
 		return false;
+	}
+
+	bool ComputeLeftCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
+	{
+		// For each rectangle in the iterator's list
+		for (list<Rect>::iterator rect = *iterators; rect != freeList.end() && listLen++ < length; rect++)
+		{
+			largest.x1 = min(largest.x1, rect->x1);
+			largest.y1 = max(largest.y1, rect->y1);
+			largest.x2 = max(largest.x2, rect->x2);
+			largest.y2 = min(largest.y2, rect->y2);
+			rectsInPlay.push_back(rect);
+		}
+
+		// Non contigous rectangles will be inverted in either dimension
+		if (largest.x1 >= largest.x2 || largest.y1 >= largest.y2)
+			return false;
+	}
+
+	bool ComputeRightCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
+	{
+		return false;
+	}
+
+	bool ComputeTopCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
+	{
+		return false;
+	}
+
+	bool ComputeBottomCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
+	{
+		return false;
+	}
+
+
+	bool Explore(ListOfIterators iterators, int width, int height, int length, list<Rect>::iterator nextFromFreeList)
+	{
+		ListOfIterators rectsInPlay;
+
+		// For each entry in the list of iterators
+		for (ListOfIterators::iterator i = iterators.begin(); i != iterators.end(); i++)
+		{
+			Rect largest = *(*i); // First rect in the list
+			ComputeLeftCaseDimensions(largest, i, rectsInPlay, length);
+
+			// Try creating rect
+			list<Rect> newFreeRects;
+			if (CreateSubRect(largest, width, height, newFreeRects))
+			{
+				ListMaintanceAfterCreate(largest, width, height, newFreeRects, rectsInPlay);
+				return true;
+			}
+
+			Rect largest = *(*i); // First rect in the list
+			ComputeTopCaseDimensions(largest, i, rectsInPlay, length);
+
+			// Try creating rect
+			list<Rect> newFreeRects;
+			if (CreateSubRect(largest, width, height, newFreeRects))
+			{
+				ListMaintanceAfterCreate(largest, width, height, newFreeRects, rectsInPlay);
+				return true;
+			}
+
+			Rect largest = *(*i); // First rect in the list
+			ComputeRightCaseDimensions(largest, i, rectsInPlay, length);
+
+			// Try creating rect
+			list<Rect> newFreeRects;
+			if (CreateSubRect(largest, width, height, newFreeRects))
+			{
+				ListMaintanceAfterCreate(largest, width, height, newFreeRects, rectsInPlay);
+				return true;
+			}
+
+			Rect largest = *(*i); // First rect in the list
+			ComputeBottomCaseDimensions(largest, i, rectsInPlay, length);
+
+			// Try creating rect
+			list<Rect> newFreeRects;
+			if (CreateSubRect(largest, width, height, newFreeRects))
+			{
+				ListMaintanceAfterCreate(largest, width, height, newFreeRects, rectsInPlay);
+				return true;
+			}
+
+		}
+
+		// Didn't find any of this run length, so explore the next length of each permutation
+		if (length < freeListLen)
+		{
+			for (ListOfIterators::iterator i = iterators.begin(); i != iterators.end(); i++)
+			{
+				if (nextFromFreeList == freeList.end())  // Out of permutations to explore in this branch
+					return false;
+
+				// Copy iterator list
+				ListOfIterators nextIterators;
+				for (ListOfIterators::iterator c = iterators.begin(); c != iterators.end(); c++)
+				{
+					nextIterators.push_back(*c);
+				}
+
+				nextIterators.push_back(nextFromFreeList);
+				list<Rect>::iterator nextnextFromFreeList = nextFromFreeList;
+				nextnextFromFreeList++;
+				Explore(nextIterators, width, height, length + 1, nextnextFromFreeList);
+			}
+		}
+		return false;
+	}
+
+	void ListMaintanceAfterCreate(Rect largest, int width, int height, list<Rect> newFreeRects, ListOfIterators rectsInPlay)
+	{
+		Rect newRect = Rect(largest.x1, largest.y1, largest.x1 + width, largest.y1 + height);
+
+		// Add 1 or 2 free rects resulting from the chop
+		for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
+			freeList.push_back(*newFreeRectIter);
+
+		// Remove rectangles that were chopped
+		for (ListOfIterators::iterator i = rectsInPlay.begin(); i != rectsInPlay.end(); i++)
+			freeList.erase(*i);
 	}
 
 private:
@@ -159,14 +241,32 @@ private:
 
 };
 
+void GetRect(int width, int height, Packer* packer, list<Rect>& allocated)
+{
+	Rect newRect;
+	if (packer->Request(width, height, newRect))
+	{
+		std::cout << "Allocated rect(" << newRect.x1 << ", " << newRect.y1 << ", " << newRect.x2 << ", " << newRect.y2 << ")\n";
+		allocated.push_back(newRect);
+	}
+	else
+	{
+		std::cout << "Failed to allocate " << width << " x " << height << " rect\n";
+	}
+
+
+}
+
 int _tmain(int argc, _TCHAR* argv[])
 {
-	Packer* packer = new Packer(100, 100);
-	
-	Rect newRect;
-	if (packer->Request(20, 10, newRect))
-	{
-	}
+	Packer* packer = new Packer(10, 10);
+	list<Rect> allocated;
+
+	GetRect(4, 2, packer, allocated);
+	GetRect(5, 10, packer, allocated);
+
+	char key;
+	std::cin >> key;
 
 	return 0;
 }
