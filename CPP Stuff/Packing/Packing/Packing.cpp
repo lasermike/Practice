@@ -20,6 +20,26 @@ struct Rect
 		x1 = xa1; y1 = ya1; x2 = xa2; y2 = ya2;
 	}
 
+	bool Intersect(Rect rect2)
+	{
+		if (x1 >= rect2.x1 && x1 <= rect2.x2 &&
+			y1 >= rect2.y1 && y1 <= rect2.y2)
+			return true; // Rects top left point is contained with rect2
+		if (x2 >= rect2.x1 && x2 <= rect2.x2 &&
+			y2 >= rect2.y1 && y2 <= rect2.y2)
+			return true; // Rects lower right point is contained in rect2
+
+		if (rect2.x1 >= x1 && rect2.x1 <= x2 &&
+			rect2.y1 >= y1 && rect2.y1 <= y2)
+			return true; // rect 2's top left point contained in this rect
+
+		if (rect2.x2 >= x1 && rect2.x2 <= x2 &&
+			rect2.y2 >= y1 && rect2.y2 <= y2)
+			return true; // rect 2's lower right point contained in this rect.  Unnecessary check?
+
+		return false;
+	}
+
 	int x1, y1, x2, y2;
 };
 
@@ -72,7 +92,7 @@ public:
 			iterators.push_back(i);
 			list<Rect>::iterator nextFromFreeList = i;
 			nextFromFreeList++;
-			bool retval = Explore(iterators, width, height, 1, nextFromFreeList);
+			bool retval = Explore(iterators, width, height, 1, nextFromFreeList, newRect);
 			if (retval)
 				return true;
 		}
@@ -80,90 +100,51 @@ public:
 		return false;
 	}
 
-	bool ComputeLeftCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
+private:
+
+	bool EnsureAllIntersect(Rect& largest, ListOfIterators::iterator iterators, int length)
 	{
-		// For each rectangle in the iterator's list
+		int listLen = 0;
+		// Ensure all rectangles were adjacent
 		for (list<Rect>::iterator rect = *iterators; rect != freeList.end() && listLen++ < length; rect++)
 		{
-			largest.x1 = min(largest.x1, rect->x1);
-			largest.y1 = max(largest.y1, rect->y1);
-			largest.x2 = max(largest.x2, rect->x2);
-			largest.y2 = min(largest.y2, rect->y2);
-			rectsInPlay.push_back(rect);
+			if (!largest.Intersect(*rect))
+				return false;
 		}
 
-		// Non contigous rectangles will be inverted in either dimension
-		if (largest.x1 >= largest.x2 || largest.y1 >= largest.y2)
-			return false;
+		return true;
 	}
 
-	bool ComputeRightCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
+	bool Explore(ListOfIterators iterators, int width, int height, int length, list<Rect>::iterator nextFromFreeList, Rect& newRect)
 	{
-		return false;
-	}
-
-	bool ComputeTopCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
-	{
-		return false;
-	}
-
-	bool ComputeBottomCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
-	{
-		return false;
-	}
-
-
-	bool Explore(ListOfIterators iterators, int width, int height, int length, list<Rect>::iterator nextFromFreeList)
-	{
-		ListOfIterators rectsInPlay;
-
 		// For each entry in the list of iterators
 		for (ListOfIterators::iterator i = iterators.begin(); i != iterators.end(); i++)
 		{
+			ListOfIterators rectsInPlay;
 			Rect largest = *(*i); // First rect in the list
-			ComputeLeftCaseDimensions(largest, i, rectsInPlay, length);
-
-			// Try creating rect
-			list<Rect> newFreeRects;
-			if (CreateSubRect(largest, width, height, newFreeRects))
+			if (ComputeHorizCaseDimensions(largest, i, rectsInPlay, length))
 			{
-				ListMaintanceAfterCreate(largest, width, height, newFreeRects, rectsInPlay);
-				return true;
+				// Try creating rect
+				list<Rect> newFreeRects;
+				if (CreateSubRect(largest, width, height, newFreeRects))
+				{
+					ListMaintanceAfterCreate(largest, width, height, newRect, newFreeRects, rectsInPlay);
+					return true;
+				}
 			}
 
-			Rect largest = *(*i); // First rect in the list
-			ComputeTopCaseDimensions(largest, i, rectsInPlay, length);
-
-			// Try creating rect
-			list<Rect> newFreeRects;
-			if (CreateSubRect(largest, width, height, newFreeRects))
+			rectsInPlay.clear();
+			largest = *(*i); // First rect in the list
+			if (ComputeVertCaseDimensions(largest, i, rectsInPlay, length))
 			{
-				ListMaintanceAfterCreate(largest, width, height, newFreeRects, rectsInPlay);
-				return true;
+				// Try creating rect
+				list<Rect> newFreeRects;
+				if (CreateSubRect(largest, width, height, newFreeRects))
+				{
+					ListMaintanceAfterCreate(largest, width, height, newRect, newFreeRects, rectsInPlay);
+					return true;
+				}
 			}
-
-			Rect largest = *(*i); // First rect in the list
-			ComputeRightCaseDimensions(largest, i, rectsInPlay, length);
-
-			// Try creating rect
-			list<Rect> newFreeRects;
-			if (CreateSubRect(largest, width, height, newFreeRects))
-			{
-				ListMaintanceAfterCreate(largest, width, height, newFreeRects, rectsInPlay);
-				return true;
-			}
-
-			Rect largest = *(*i); // First rect in the list
-			ComputeBottomCaseDimensions(largest, i, rectsInPlay, length);
-
-			// Try creating rect
-			list<Rect> newFreeRects;
-			if (CreateSubRect(largest, width, height, newFreeRects))
-			{
-				ListMaintanceAfterCreate(largest, width, height, newFreeRects, rectsInPlay);
-				return true;
-			}
-
 		}
 
 		// Didn't find any of this run length, so explore the next length of each permutation
@@ -184,15 +165,65 @@ public:
 				nextIterators.push_back(nextFromFreeList);
 				list<Rect>::iterator nextnextFromFreeList = nextFromFreeList;
 				nextnextFromFreeList++;
-				Explore(nextIterators, width, height, length + 1, nextnextFromFreeList);
+				bool retval = Explore(nextIterators, width, height, length + 1, nextnextFromFreeList, newRect);
+				if (retval)
+					return true;
 			}
 		}
 		return false;
 	}
 
-	void ListMaintanceAfterCreate(Rect largest, int width, int height, list<Rect> newFreeRects, ListOfIterators rectsInPlay)
+	// Rect of form
+	//  X                             X
+	//  XYYY                       YYYX
+	//  X                             X
+	bool ComputeHorizCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
 	{
-		Rect newRect = Rect(largest.x1, largest.y1, largest.x1 + width, largest.y1 + height);
+		int listLen = 0;
+
+		// For each rectangle in the iterator's list
+		for (list<Rect>::iterator rect = *iterators; rect != freeList.end() && listLen++ < length; rect++)
+		{
+			largest.x1 = min(largest.x1, rect->x1);
+			largest.y1 = max(largest.y1, rect->y1);
+			largest.x2 = max(largest.x2, rect->x2);
+			largest.y2 = min(largest.y2, rect->y2);
+			rectsInPlay.push_back(rect);
+		}
+
+		if (!EnsureAllIntersect(largest, iterators, length))
+			return false;
+
+		return true;
+	}
+
+	// Rect of form
+	//     X             YYY
+	//     X              X
+	//    YYY             X
+	bool ComputeVertCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators rectsInPlay, int length)
+	{
+		int listLen = 0;
+
+		// For each rectangle in the iterator's list
+		for (list<Rect>::iterator rect = *iterators; rect != freeList.end() && listLen++ < length; rect++)
+		{
+			largest.x1 = max(largest.x1, rect->x1);
+			largest.y1 = min(largest.y1, rect->y1);
+			largest.x2 = min(largest.x2, rect->x2);
+			largest.y2 = max(largest.y2, rect->y2);
+			rectsInPlay.push_back(rect);
+		}
+
+		if (!EnsureAllIntersect(largest, iterators, length))
+			return false;
+
+		return true;
+	}
+
+	void ListMaintanceAfterCreate(Rect largest, int width, int height, Rect& newRect, list<Rect> newFreeRects, ListOfIterators rectsInPlay)
+	{
+		newRect = Rect(largest.x1, largest.y1, largest.x1 + width, largest.y1 + height);
 
 		// Add 1 or 2 free rects resulting from the chop
 		for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
@@ -202,8 +233,6 @@ public:
 		for (ListOfIterators::iterator i = rectsInPlay.begin(); i != rectsInPlay.end(); i++)
 			freeList.erase(*i);
 	}
-
-private:
 
 	bool CreateSubRect(Rect rect, int width, int height, list<Rect>& newFreeRects)
 	{
@@ -223,12 +252,8 @@ private:
 
 			return true;
 		}
-
 		return false;
 	}
-
-
-
 };
 
 void GetRect(int width, int height, Packer* packer, list<Rect>& allocated)
@@ -243,8 +268,6 @@ void GetRect(int width, int height, Packer* packer, list<Rect>& allocated)
 	{
 		std::cout << "Failed to allocate " << width << " x " << height << " rect\n";
 	}
-
-
 }
 
 int _tmain(int argc, _TCHAR* argv[])
