@@ -23,16 +23,6 @@ struct Rect
 	int x1, y1, x2, y2;
 };
 
-bool compare_rects(const Rect& first, Rect& second)
-{
-	if (first.y1 == second.y1)
-	{
-		return first.x1 < first.y1;
-	}
-	else if (first.y1 < second.y1)
-		return true;
-	else return first.x1 < second.x1;
-}
 
 typedef list<list<Rect>::iterator> ListOfIterators;
 
@@ -273,3 +263,15 @@ int _tmain(int argc, _TCHAR* argv[])
 
 
 
+/*
+bool compare_rects(const Rect& first, Rect& second)
+{
+	if (first.y1 == second.y1)
+	{
+		return first.x1 < first.y1;
+	}
+	else if (first.y1 < second.y1)
+		return true;
+	else return first.x1 < second.x1;
+}
+*/
