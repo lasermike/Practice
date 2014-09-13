@@ -7,9 +7,8 @@
 #include <algorithm> 
 #include <list>
 
-#include "packer.h"
+#include "packing.h"
 
-using namespace std;
 
 
 Packer::Packer(int width, int height)
@@ -47,6 +46,7 @@ bool Packer::Request(int width, int height, Rect& newRect)
 			for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
 				freeList.push_back(*newFreeRectIter);
 			freeList.erase(freeRect);
+			allocatedList.push_back(newRect);
 			return true;
 		}
 		freeListLen++;
@@ -62,7 +62,10 @@ bool Packer::Request(int width, int height, Rect& newRect)
 		nextFromFreeList++;
 		bool retval = Explore(iterators, width, height, 1, nextFromFreeList, newRect);
 		if (retval)
+		{
+			allocatedList.push_back(newRect);
 			return true;
+		}
 	}
 
 	return false;
@@ -93,110 +96,6 @@ bool Packer::EnsureAllIntersect(Rect& largest, ListOfIterators::iterator iterato
 
 	return true;
 }
-
-/*// Clips consumedRect by clipRect, adding intersection to newFreeRects
-	void Packer::Clip2(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
-{
-	Rect rect = consumedRect;
-
-	// Case where this rect's height extends above new rect region
-	//  Input X       Output     F
-	//        X                  F
-	//        XYY				 NNN
-	//        X                  R
-	if (rect.y1 < clipRect.y1)
-	{
-		//INCOMPLETE!!
-		Rect newFree = Rect(rect.x1, rect.y1, rect.x2, clipRect.y1 - 1);
-		if (newFree.Width() > 0 && newFree.Height() > 0)
-			newFreeRects.push_back(newFree);
-		rect = Rect(rect.x1, clipRect.y2 + 1, rect.x2, rect.y2); // Remainder
-	}
-
-	if (rect.y2 > clipRect.y2)
-	{
-		// Case where this rect's height extends below and left of clip region
-		//  Input  X       Output     C
-		//         X                  C
-		//        YYY                1C2
-		if (rect.x1 < clipRect.x1)
-		{
-			Rect newFree = Rect(rect.x1, rect.y1, clipRect.x1 - 1, rect.y2);
-			if (newFree.Width() > 0 && newFree.Height() > 0)
-			{
-				newFreeRects.push_back(newFree);
-				rect = Rect(clipRect.x1, clipRect.y2 + 1, rect.x2, rect.y2);  // Remainder
-				if (rect.Width() > 0 && rect.Height() > 0)
-					newFreeRects.push_back(rect);
-			}
-		}
-		else
-		{
-			// Case where this rect's height extends below and right of clip region
-			//  Input         Output      
-			//          Y                 C
-			//          YXX               CX
-			//           XX               CX
-			Rect newFree = Rect(rect.x1, clipRect.y2 + 1, rect.x2, rect.y2);
-			if (newFree.Width() > 0 && newFree.Height() > 0)
-				newFreeRects.push_back(newFree);
-			rect = Rect(clipRect.x2 + 1, rect.y1, rect.x2, newFree.y1 - 1);  // Remainder
-			if (rect.Width() > 0 && rect.Height() > 0)
-				newFreeRects.push_back(rect);
-		}
-		return;
-	}
-
-	if (rect.x1 < clipRect.x1)
-	{
-		// Case where this rect's width extends lower left of clip region
-		//  Input          Largest
-		//          Y                  L
-		//          Y                  L
-		//        XXXX               XXLX
-		if (rect.y1 < clipRect.y1)
-		{
-			Rect newFree = Rect(rect.x1, rect.y1, clipRect.x1 - 1, rect.y2);
-			if (newFree.Width() > 0 && newFree.Height() > 0)
-				newFreeRects.push_back(newFree);
-			rect = Rect(clipRect.x1 + 1, rect.y1, rect.x2, rect.y2);  // Remainder
-			if (rect.Width() > 0 && rect.Height() > 0)
-				newFreeRects.push_back(rect);
-		}
-		else
-		{
-			// Case where this rect's width extends upper left of clip region
-			//  Input   
-			//        XXXX      Largest  XXLX
-			//          Y                  L
-			//          Y                  L
-			Rect newFree = Rect(rect.x1, rect.y1, clipRect.x1 - 1, rect.y2);
-			if (newFree.Width() > 0 && newFree.Height() > 0)
-				newFreeRects.push_back(newFree);
-			rect = Rect(clipRect.x1 + 1, rect.y1, rect.x2, rect.y2);  // Remainder
-			if (rect.Width() > 0 && rect.Height() > 0)
-				newFreeRects.push_back(rect);
-
-		}
-		return;
-	}
-	// Case where this rect's height extends right of largest region
-	//  Input Y       Largest   L
-	//        YXX               LXX
-	//        Y                 L
-	if (rect.x2 > clipRect.x2)
-	{
-		//INCOMPLETE!!
-		Rect newFree = Rect(clipRect.x2 + 1, rect.y1, rect.x2, rect.y2);
-		if (newFree.Width() > 0 && newFree.Height() > 0)
-		{
-			newFreeRects.push_back(newFree);
-			//rect = Rect()
-			if (rect.Width() > 0 && rect.Height() > 0)
-				newFreeRects.push_back(rect);
-		}
-	}
-}*/
 
 // Clips consumedRect by clipRect, adding intersection to newFreeRects
 void Packer::Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
@@ -384,7 +283,7 @@ bool Packer::TryCreateSubRect(Rect largest, int width, int height, Rect& newRect
 
 
 
-void Packer::GetRect(int width, int height, Packer* packer, list<Rect>& allocated)
+void PackerTest::GetRect(int width, int height, Packer* packer, list<Rect>& allocated)
 {
 	Rect newRect;
 	if (packer->Request(width, height, newRect))
@@ -398,20 +297,20 @@ void Packer::GetRect(int width, int height, Packer* packer, list<Rect>& allocate
 	}
 }
 
-void PackertTest::Case1()
+void PackerTest::Case1()
 {
 	Packer* packer = new Packer(10, 10);
 	list<Rect> allocated;
 
-	GetRect(4, 2, packer, allocated);
+	PackerTest::GetRect(4, 2, packer, allocated);
 	packer->OutputFree();
 	packer->CheckFree(Rect(0, 3, 10, 10));
 	packer->CheckFree(Rect(5, 0, 10, 2));
 
-	GetRect(5, 8, packer, allocated);
+	PackerTest::GetRect(5, 8, packer, allocated);
 	packer->OutputFree();
-	packer->CheckFree(Rect(0, 3, 4, 10));
-	packer->CheckFree(Rect(5, 9, 10, 10));
+	packer->CheckFree(Rect(0, 3, 4, 8));
+	packer->CheckFree(Rect(0, 9, 10, 10));
 	free(packer);
 }
 
@@ -430,8 +329,8 @@ void PackerTest::Case2()
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	Case1();
-	Case2();
+	PackerTest::Case1();
+	PackerTest::Case2();
 
 	char key;
 	std::cin >> key;

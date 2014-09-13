@@ -1,5 +1,7 @@
 
-typedef list<list<Rect>::iterator> ListOfIterators;
+#include <list>
+#include <iostream>
+using namespace std;
 
 struct Rect
 {
@@ -40,14 +42,14 @@ struct Rect
 
 	void Print()
 	{
-		cout << "(" << x1 << ", " << y1 << ", " << x2 << ", " << y2 << ")";
+		std::cout << "(" << x1 << ", " << y1 << ", " << x2 << ", " << y2 << ")";
 	}
-	int Width()
+	const int Width() const
 	{
 		return x2 - x1;
 	}
 
-	int Height()
+	const int Height() const
 	{
 		return y2 - y1;
 	}
@@ -55,35 +57,46 @@ struct Rect
 	int x1, y1, x2, y2;
 };
 
+typedef list<list<Rect>::iterator> ListOfIterators;
+
 class Packer
 {
 private:
 	list<Rect> freeList;
+	list<Rect> allocatedList;
 	int freeListLen;
 	int atlasWidth;
 	int atlasHeight;
 
 public:
 	Packer(int width, int height);
-	void OutputFree()
-	bool Request(int width, int height, Rect& newRect)
-	void CheckFree(Rect rect)
+	bool Request(int width, int height, Rect& newRect);
+
+	void OutputFree();
+	void CheckFree(Rect rect);
+	const int GetWidth() const { return atlasWidth; }
+	const int GetHeight() const { return atlasHeight; }
+	const list<Rect>& GetFreeList() { return freeList; }
+	const list<Rect>& GetAllocatedList() { return allocatedList; }
 
 private:
 
-	bool EnsureAllIntersect(Rect& largest, ListOfIterators::iterator iterators, int length)
-	void Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
-	bool Explore(ListOfIterators& permutation, int width, int height, int length, list<Rect>::iterator nextFromFreeList, Rect& newRect)
-	bool ComputeHorizCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length)
-	bool ComputeVertCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length)
-	void ListMaintanceAfterCreate(Rect largest, int width, int height, list<Rect> newFreeRects, ListOfIterators& freeRectsBeingConsumed)
-	bool TryCreateSubRect(Rect largest, int width, int height, Rect& newRect)
-	void GetRect(int width, int height, Packer* packer, list<Rect>& allocated)
+	bool EnsureAllIntersect(Rect& largest, ListOfIterators::iterator iterators, int length);
+	void Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects);
+	bool Explore(ListOfIterators& permutation, int width, int height, int length, list<Rect>::iterator nextFromFreeList, Rect& newRect);
+	bool ComputeHorizCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length);
+	bool ComputeVertCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length);
+	void ListMaintanceAfterCreate(Rect largest, int width, int height, list<Rect> newFreeRects, ListOfIterators& freeRectsBeingConsumed);
+	bool TryCreateSubRect(Rect largest, int width, int height, Rect& newRect);
+
 };
 
-class PackertTest
+
+
+class PackerTest
 {
 public:
 	static void Case1();
 	static void Case2();
+	static void GetRect(int width, int height, Packer* packer, list<Rect>& allocated);
 };
