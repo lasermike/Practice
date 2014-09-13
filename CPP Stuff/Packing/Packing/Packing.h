@@ -67,6 +67,7 @@ private:
 	int freeListLen;
 	int atlasWidth;
 	int atlasHeight;
+	int gap;
 
 public:
 	Packer(int width, int height);
@@ -98,5 +99,5 @@ class PackerTest
 public:
 	static void Case1();
 	static void Case2();
-	static void GetRect(int width, int height, Packer* packer, list<Rect>& allocated);
+	static bool GetRect(int width, int height, Packer* packer, Rect& newRect);
 };

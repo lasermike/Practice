@@ -17,45 +17,89 @@ const unsigned int WM_CREATERECTS = WM_USER + 1;
 const unsigned int windowSizeMargin = 40;
 const int drawMargin = 16;
 
-
 // Global Variables:
 HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 Packer* _packer = NULL;
 
-void TestCase3()
+// Predeclaration
+void WindowResize(HWND hWnd);
+
+void TestCase3(HWND hWnd)
 {
 	_packer = new Packer(100, 100);
-	list<Rect> allocated;
+	WindowResize(hWnd);
 
-	PackerTest::GetRect(40, 20, _packer, allocated);
-	_packer->OutputFree();
+	Rect newRect;
+
+	PackerTest::GetRect(40, 20, _packer, newRect);
 	_packer->CheckFree(Rect(0, 21, 100, 100));
 	_packer->CheckFree(Rect(41, 0, 100, 20));
 
-	PackerTest::GetRect(50, 80, _packer, allocated);
-	_packer->OutputFree();
+	PackerTest::GetRect(50, 80, _packer, newRect);
 	_packer->CheckFree(Rect(0, 30, 40, 80));
 	_packer->CheckFree(Rect(0, 90, 100, 100));
 }
 
-void TestCase4()
+void TestCaseR(HWND hWnd)
 {
-	srand(0);
+	srand(1);
 
-	_packer = new Packer(256, 256);
-	list<Rect> allocated;
+	_packer = new Packer(100, 100);
+	WindowResize(hWnd);
 
-	for (int i = 0; i < 4; i++)
+	Rect newRect;
+
+	for (int i = 0; i < 7; i++)
 	{
-		int height = (int) ( (rand() / (float) RAND_MAX) * 256);
+		int height = (int)((rand() / (float)RAND_MAX) * 75) + 10;
 		int width = (height * 4) / 3;
-		PackerTest::GetRect(width, height, _packer, allocated);
-		_packer->OutputFree();
+		if (PackerTest::GetRect(width, height, _packer, newRect))
+		{
+			// Repaint
+			InvalidateRect(hWnd, NULL, TRUE);
+			Sleep(250);
+		}
 	}
-
 }
+
+void TestCase5(HWND hWnd)
+{
+	_packer = new Packer(100, 100);
+	WindowResize(hWnd);
+
+	Rect newRect;
+
+	PackerTest::GetRect(13, 10, _packer, newRect);
+	PackerTest::GetRect(89, 67, _packer, newRect);
+	InvalidateRect(hWnd, NULL, TRUE);
+	Sleep(2000);
+	PackerTest::GetRect(37, 28, _packer, newRect);
+
+	// Repaint
+	InvalidateRect(hWnd, NULL, TRUE);
+}
+
+void TestCase6(HWND hWnd)
+{
+	_packer = new Packer(100, 100);
+	WindowResize(hWnd);
+
+	Rect newRect;
+
+	PackerTest::GetRect(13, 10, _packer, newRect);
+	PackerTest::GetRect(69, 52, _packer, newRect);
+	PackerTest::GetRect(32, 24, _packer, newRect);
+	InvalidateRect(hWnd, NULL, TRUE);
+	Sleep(2000);
+
+	PackerTest::GetRect(48, 36, _packer, newRect);
+
+	// Repaint
+	InvalidateRect(hWnd, NULL, TRUE);
+}
+
 
 VOID OnPaint(HDC hdc)
 {
@@ -68,22 +112,27 @@ VOID OnPaint(HDC hdc)
 		graphics.DrawRectangle(&blackPen, drawMargin, drawMargin, _packer->GetWidth(), _packer->GetHeight());
 
 		// Draw allocated
-		//Gdiplus::Pen greenPen(Gdiplus::Color(255, 0, 255, 0));
+		int count = 0;
 		Gdiplus::SolidBrush greenBrush(Gdiplus::Color(128, 0, 255, 0));
 		for (auto i = _packer->GetAllocatedList().begin(); i != _packer->GetAllocatedList().end(); i++)
 		{
 			graphics.FillRectangle(&greenBrush, i->x1 + drawMargin, i->y1 + drawMargin,
 								   i->Width(), i->Height());
+			count++;
 		}
+		cout << " " << count << " allocated rects\n";
 
 		// Draw allocated
-		//Gdiplus::Pen bluePen(Gdiplus::Color(255, 0, 0, 255));
+		count = 0;
 		Gdiplus::SolidBrush blueBrush(Gdiplus::Color(128, 0, 0, 255));
 		for (auto i = _packer->GetFreeList().begin(); i != _packer->GetFreeList().end(); i++)
 		{
 			graphics.FillRectangle(&blueBrush, i->x1 + drawMargin, i->y1 + drawMargin,
 				i->Width(), i->Height());
+			count++;
 		}
+		cout << " " << count << " free rects\n";
+
 
 	}
 }
@@ -201,7 +250,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
-void SetWindowSize(HWND hWnd)
+void WindowResize(HWND hWnd)
 {
 	RECT rect, clientRect;
 
@@ -213,6 +262,22 @@ void SetWindowSize(HWND hWnd)
 
 		SetWindowPos(hWnd, NULL, rect.left, rect.top, _packer->GetWidth() + windowSizeMargin + xfudge, _packer->GetHeight() + windowSizeMargin + yfudge, 0);
 	}
+}
+
+struct thread_data
+{
+	HWND _hWnd;
+	thread_data(HWND hWnd) : _hWnd(hWnd) {}
+};
+
+DWORD WINAPI thread_func(LPVOID lpParameter)
+{
+	thread_data *td = (thread_data*)lpParameter;
+	cout << "thread with hWnd = " << td->_hWnd<< endl;
+
+	TestCase6(td->_hWnd);
+
+	return 0;
 }
 
 //
@@ -230,7 +295,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
-	BOOL ret;
 	
 	switch (message)
 	{
@@ -238,9 +302,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		PostMessage(hWnd, WM_CREATERECTS, 0, 0);
 		break;
 	case WM_CREATERECTS:
-		TestCase4();
-		ret = RedrawWindow(hWnd, NULL, NULL, RDW_ERASE | RDW_INTERNALPAINT);
-		SetWindowSize(hWnd);
+		CreateThread(NULL, 0, thread_func, new thread_data(hWnd), 0, 0);
 		break;
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);

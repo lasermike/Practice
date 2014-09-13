@@ -15,6 +15,7 @@ Packer::Packer(int width, int height)
 {
 	atlasWidth = width;
 	atlasHeight = height;
+	gap = 1;
 	Rect rect(0, 0, atlasWidth, atlasHeight);
 	freeList.push_back(rect);
 }
@@ -83,7 +84,6 @@ void Packer::CheckFree(Rect rect)
 	cout << " not found\n";
 }
 
-
 bool Packer::EnsureAllIntersect(Rect& largest, ListOfIterators::iterator iterators, int length)
 {
 	int listLen = 0;
@@ -104,7 +104,7 @@ void Packer::Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
 	if (consumedRect.y1 < clipRect.y1)
 	{
 		Rect splitRect = consumedRect;
-		splitRect.y2 = clipRect.y1 - 1;
+		splitRect.y2 = clipRect.y1 - gap;
 		if (splitRect.Width() > 0)
 			newFreeRects.push_back(splitRect);
 	}
@@ -113,7 +113,7 @@ void Packer::Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
 	if (consumedRect.y2 > clipRect.y2)
 	{
 		Rect splitRect = consumedRect;
-		splitRect.y1 = clipRect.y2 + 1;
+		splitRect.y1 = clipRect.y2 + gap;
 		if (splitRect.Width() > 0 && splitRect.Height() > 0)
 			newFreeRects.push_back(splitRect);
 	}
@@ -122,7 +122,7 @@ void Packer::Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
 	if (consumedRect.x1 < clipRect.x1)
 	{
 		Rect splitRect = consumedRect;
-		splitRect.x2 = clipRect.x1 - 1;
+		splitRect.x2 = clipRect.x1 - gap;
 		splitRect.y1 = max(clipRect.y1, splitRect.y1);
 		splitRect.y2 = min(clipRect.y2, splitRect.y2);
 		if (splitRect.Width() > 0 && splitRect.Height() > 0)
@@ -133,7 +133,7 @@ void Packer::Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
 	if (consumedRect.x2 > clipRect.x2)
 	{
 		Rect splitRect = consumedRect;
-		splitRect.x1 = clipRect.x2 + 1;
+		splitRect.x1 = clipRect.x2 + gap;
 		splitRect.y1 = max(clipRect.y1, splitRect.y1);
 		splitRect.y2 = min(clipRect.y2, splitRect.y2);
 		if (splitRect.Width() > 0 && splitRect.Height() > 0)
@@ -222,16 +222,22 @@ bool Packer::ComputeHorizCaseDimensions(Rect& largest, ListOfIterators::iterator
 	// For each rectangle in the iterator's list
 	for (list<Rect>::iterator rect = *iterators; rect != freeList.end() && listLen++ < length; rect++)
 	{
-		largest.x1 = min(largest.x1, rect->x1);
-		largest.y1 = max(largest.y1, rect->y1);
-		largest.x2 = max(largest.x2, rect->x2);
-		largest.y2 = min(largest.y2, rect->y2);
-		freeRectsBeingConsumed.push_back(rect);
+		if (abs(largest.x2 - rect->x1) <= 1 || abs(largest.x1 - rect->x2) <= 1)
+		{
+			largest.x1 = min(largest.x1, rect->x1);
+			largest.y1 = max(largest.y1, rect->y1);
+			largest.x2 = max(largest.x2, rect->x2);
+			largest.y2 = min(largest.y2, rect->y2);
+			freeRectsBeingConsumed.push_back(rect);
+		}
 	}
 
 	// Note to double check this is actually sufficient to determine if all rectangles were adjacent
-	if (!EnsureAllIntersect(largest, iterators, length))
+	// It turns out that this isn't useful...!!!!
+	/*if (!EnsureAllIntersect(largest, iterators, length))
+	{
 		return false;
+	}*/
 
 	return true;
 }
@@ -247,11 +253,14 @@ bool Packer::ComputeVertCaseDimensions(Rect& largest, ListOfIterators::iterator 
 	// For each rectangle in the iterator's list
 	for (list<Rect>::iterator rect = *iterators; rect != freeList.end() && listLen++ < length; rect++)
 	{
-		largest.x1 = max(largest.x1, rect->x1);
-		largest.y1 = min(largest.y1, rect->y1);
-		largest.x2 = min(largest.x2, rect->x2);
-		largest.y2 = max(largest.y2, rect->y2);
-		freeRectsBeingConsumed.push_back(rect);
+		if (abs(largest.y2 - rect->y1) <= 1 || abs(largest.y1 - rect->y2) <= 1)
+		{
+			largest.x1 = max(largest.x1, rect->x1);
+			largest.y1 = min(largest.y1, rect->y1);
+			largest.x2 = min(largest.x2, rect->x2);
+			largest.y2 = max(largest.y2, rect->y2);
+			freeRectsBeingConsumed.push_back(rect);
+		}
 	}
 
 	if (!EnsureAllIntersect(largest, iterators, length))
@@ -283,31 +292,34 @@ bool Packer::TryCreateSubRect(Rect largest, int width, int height, Rect& newRect
 
 
 
-void PackerTest::GetRect(int width, int height, Packer* packer, list<Rect>& allocated)
+bool PackerTest::GetRect(int width, int height, Packer* packer, Rect& newRect)
 {
-	Rect newRect;
+	bool retval = false;
+	cout << "Requesting (" << width << " x " << height << ") rect\n";
 	if (packer->Request(width, height, newRect))
 	{
 		std::cout << "Allocated rect(" << newRect.x1 << ", " << newRect.y1 << ", " << newRect.x2 << ", " << newRect.y2 << ")\n";
-		allocated.push_back(newRect);
+		retval = true;
 	}
 	else
 	{
 		std::cout << "Failed to allocate " << width << " x " << height << " rect\n";
 	}
+	packer->OutputFree();
+	return retval;
 }
 
 void PackerTest::Case1()
 {
 	Packer* packer = new Packer(10, 10);
-	list<Rect> allocated;
 
-	PackerTest::GetRect(4, 2, packer, allocated);
+	Rect newRect;
+	PackerTest::GetRect(4, 2, packer, newRect);
 	packer->OutputFree();
 	packer->CheckFree(Rect(0, 3, 10, 10));
 	packer->CheckFree(Rect(5, 0, 10, 2));
 
-	PackerTest::GetRect(5, 8, packer, allocated);
+	PackerTest::GetRect(5, 8, packer, newRect);
 	packer->OutputFree();
 	packer->CheckFree(Rect(0, 3, 4, 8));
 	packer->CheckFree(Rect(0, 9, 10, 10));
@@ -317,9 +329,9 @@ void PackerTest::Case1()
 void PackerTest::Case2()
 {
 	Packer* packer = new Packer(10, 10);
-	list<Rect> allocated;
 
-	GetRect(2, 9, packer, allocated);
+	Rect newRect;
+	GetRect(2, 9, packer, newRect);
 	packer->OutputFree();
 	//packer->CheckFree(Rect(9, 0, 10, 2));
 	//packer->CheckFree(Rect(3, 0, 10, 10));
