@@ -22,9 +22,36 @@ HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 Packer* _packer = NULL;
+double PCFreq = 0.0;							// Perf
+__int64 CounterStart = 0;						// Perf
 
 // Predeclaration
 void WindowResize(HWND hWnd);
+void StartCounter();
+double GetCounter();
+
+void TestCaseR(HWND hWnd)
+{
+	srand(3);  // time(NULL));
+
+ 
+	_packer = new Packer(500, 500);
+	WindowResize(hWnd);
+
+	Rect newRect;
+
+	for (int i = 0; i < 11; i++)
+	{
+		int height = (int)((rand() / (float)RAND_MAX) * 200) + 50;
+		int width = (height * 4) / 3; // 4x3
+		if (PackerTest::GetRect(width, height, _packer, newRect))
+		{
+			// Repaint
+			InvalidateRect(hWnd, NULL, TRUE);
+			Sleep(200);
+		}
+	}
+}
 
 void TestCase3(HWND hWnd)
 {
@@ -40,28 +67,6 @@ void TestCase3(HWND hWnd)
 	PackerTest::GetRect(50, 80, _packer, newRect);
 	_packer->CheckFree(Rect(0, 30, 40, 80));
 	_packer->CheckFree(Rect(0, 90, 100, 100));
-}
-
-void TestCaseR(HWND hWnd)
-{
-	srand(time(NULL));
-
-	_packer = new Packer(500, 500);
-	WindowResize(hWnd);
-
-	Rect newRect;
-
-	for (int i = 0; i < 50; i++)
-	{
-		int height = (int)((rand() / (float)RAND_MAX) * 100) + 50;
-		int width = (height * 4) / 3; // 4x3
-		if (PackerTest::GetRect(width, height, _packer, newRect))
-		{
-			// Repaint
-			InvalidateRect(hWnd, NULL, TRUE);
-			Sleep(200);
-		}
-	}
 }
 
 void TestCase5(HWND hWnd)
@@ -100,6 +105,23 @@ void TestCase6(HWND hWnd)
 	InvalidateRect(hWnd, NULL, TRUE);
 }
 
+
+struct thread_data
+{
+	HWND _hWnd;
+	thread_data(HWND hWnd) : _hWnd(hWnd) {}
+};
+
+DWORD WINAPI thread_func(LPVOID lpParameter)
+{
+	thread_data *td = (thread_data*)lpParameter;
+	cout << "thread with hWnd = " << td->_hWnd << endl;
+
+	StartCounter();
+	TestCaseR(td->_hWnd);
+	cout << "Test case time: " << GetCounter() << "\n";
+	return 0;
+}
 
 VOID OnPaint(HDC hdc)
 {
@@ -264,22 +286,6 @@ void WindowResize(HWND hWnd)
 	}
 }
 
-struct thread_data
-{
-	HWND _hWnd;
-	thread_data(HWND hWnd) : _hWnd(hWnd) {}
-};
-
-DWORD WINAPI thread_func(LPVOID lpParameter)
-{
-	thread_data *td = (thread_data*)lpParameter;
-	cout << "thread with hWnd = " << td->_hWnd<< endl;
-
-	TestCaseR(td->_hWnd);
-
-	return 0;
-}
-
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
@@ -354,4 +360,24 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	return (INT_PTR)FALSE;
+}
+
+
+void StartCounter()
+{
+	LARGE_INTEGER li;
+	if (!QueryPerformanceFrequency(&li))
+		cout << "QueryPerformanceFrequency failed!\n";
+
+	PCFreq = double(li.QuadPart) / 1000.0;
+
+	QueryPerformanceCounter(&li);
+	CounterStart = li.QuadPart;
+}
+
+double GetCounter()
+{
+	LARGE_INTEGER li;
+	QueryPerformanceCounter(&li);
+	return double(li.QuadPart - CounterStart) / PCFreq;
 }
