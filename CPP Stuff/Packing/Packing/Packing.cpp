@@ -35,7 +35,7 @@ bool Packer::Request(int width, int height, Rect& newRect)
 	freeListLen = 0;
 
 	// Loop through free list looking for a single rectangle that fits
-	// This case is unnecessary because the later Explore function will cover the same data set
+	// This whole case is unnecessary because the later Explore function will cover the same data set
 	for (list<Rect>::iterator freeRect = freeList.begin(); freeRect != freeList.end(); freeRect++)
 	{
 		if (TryCreateSubRect(*freeRect, width, height, newRect))
@@ -53,15 +53,26 @@ bool Packer::Request(int width, int height, Rect& newRect)
 		freeListLen++;
 	}
 
+	requestedWidth = width;
+	requestedHeight = height;
+
 	// Now try all merging all permutations of rectangles to find a fit
 	// Start by exploring each rectangle individually
 	for (list<Rect>::iterator i = freeList.begin(); i != freeList.end(); i++)
 	{
+		// Base recursion data
+		Rect largestHoriz = *i;
+		Rect largestVert = *i;
+		ListOfIterators freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert;
+		freeRectsBeingConsumedHoriz.push_back(i);
+		freeRectsBeingConsumedVert.push_back(i);
+
 		ListOfIterators iterators;
 		iterators.push_back(i);
 		list<Rect>::iterator nextFromFreeList = i;
+
 		nextFromFreeList++;
-		bool retval = Explore(iterators, width, height, 1, nextFromFreeList, newRect);
+		bool retval = Explore(iterators, largestHoriz, largestVert, freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert, 1, nextFromFreeList, newRect);
 		if (retval)
 		{
 			allocatedList.push_back(newRect);
@@ -141,45 +152,43 @@ void Packer::Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
 	}
 }
 
-bool Packer::Explore(ListOfIterators& permutation, int width, int height, int length, list<Rect>::iterator nextFromFreeList, Rect& newRect)
+bool Packer::Explore(ListOfIterators& permutation, Rect largestHoriz, Rect largestVert, ListOfIterators freeRectsBeingConsumedHoriz, ListOfIterators freeRectsBeingConsumedVert, int length, list<Rect>::iterator nextFromFreeList, Rect& newRect)
 {
 	// For each entry in the list of iterators
 	for (ListOfIterators::iterator i = permutation.begin(); i != permutation.end(); i++)
 	{
-		ListOfIterators freeRectsBeingConsumed;
-		Rect largest = *(*i); // First rect in the list
-		if (ComputeHorizCaseDimensions(largest, i, freeRectsBeingConsumed, length))
+		// Find the maximum size of contiguous rectangles favoring width
+		if (ComputeHorizCaseDimensions(largestHoriz, i, freeRectsBeingConsumedHoriz, length))
 		{
 			// Try creating rect
 			list<Rect> newFreeRects;
-			if (TryCreateSubRect(largest, width, height, newRect))
+			if (TryCreateSubRect(largestHoriz, requestedWidth, requestedHeight, newRect))
 			{
 				// Clip this rect by the largest region rect
-				Rect remainingLargest = largest;
-				for (ListOfIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
+				Rect remainingLargest = largestHoriz;
+				for (ListOfIterators::iterator i = freeRectsBeingConsumedHoriz.begin(); i != freeRectsBeingConsumedHoriz.end(); i++)
 				{
 					// Clip all consumed rects by the newly allocated rect
 					Clip(newRect, *(*i), newFreeRects);
 				}
-				ListMaintanceAfterCreate(largest, width, height, newFreeRects, freeRectsBeingConsumed);
+				ListMaintanceAfterCreate(largestHoriz, requestedWidth, requestedHeight, newFreeRects, freeRectsBeingConsumedHoriz);
 				return true;
 			}
 		}
 
-		freeRectsBeingConsumed.clear();
-		largest = *(*i); // First rect in the list
-		if (ComputeVertCaseDimensions(largest, i, freeRectsBeingConsumed, length))
+		// Find the maximum size of contiguous rectangles favoring height
+		if (ComputeVertCaseDimensions(largestVert, i, freeRectsBeingConsumedVert, length))
 		{
 			// Try creating rect
 			list<Rect> newFreeRects;
-			if (TryCreateSubRect(largest, width, height, newRect))
+			if (TryCreateSubRect(largestVert, requestedWidth, requestedHeight, newRect))
 			{
-				for (ListOfIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
+				for (ListOfIterators::iterator i = freeRectsBeingConsumedVert.begin(); i != freeRectsBeingConsumedVert.end(); i++)
 				{
 					// Clip all consumed rects by the newly allocated rect
 					Clip(newRect, *(*i), newFreeRects);
 				}
-				ListMaintanceAfterCreate(largest, width, height, newFreeRects, freeRectsBeingConsumed);
+				ListMaintanceAfterCreate(largestVert, requestedWidth, requestedHeight, newFreeRects, freeRectsBeingConsumedVert);
 				return true;
 			}
 		}
@@ -203,7 +212,7 @@ bool Packer::Explore(ListOfIterators& permutation, int width, int height, int le
 			nextIterators.push_back(nextFromFreeList);
 			list<Rect>::iterator nextnextFromFreeList = nextFromFreeList;
 			nextnextFromFreeList++;
-			bool retval = Explore(nextIterators, width, height, length + 1, nextnextFromFreeList, newRect);
+			bool retval = Explore(nextIterators, largestHoriz, largestVert, freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert, length + 1, nextnextFromFreeList, newRect);
 			if (retval)
 				return true;
 		}
@@ -217,10 +226,14 @@ bool Packer::Explore(ListOfIterators& permutation, int width, int height, int le
 //  X                             X
 bool Packer::ComputeHorizCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length)
 {
-	int listLen = 0;
+	// Assume first rect is in this set
+	list<Rect>::iterator rect = *iterators;
+	//largest = *rect; // First rect in the list
+	//freeRectsBeingConsumed.push_back(rect);
+	rect++;
 
 	// For each rectangle in the iterator's list
-	for (list<Rect>::iterator rect = *iterators; rect != freeList.end() && listLen++ < length; rect++)
+	for (int listLen = 0; rect != freeList.end() && listLen++ < length; rect++)
 	{
 		if (abs(largest.x2 - rect->x1) <= 1 || abs(largest.x1 - rect->x2) <= 1)
 		{
@@ -248,10 +261,14 @@ bool Packer::ComputeHorizCaseDimensions(Rect& largest, ListOfIterators::iterator
 //    YYY             X
 bool Packer::ComputeVertCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length)
 {
-	int listLen = 0;
+	// Assume first rect is in this set
+	list<Rect>::iterator rect = *iterators;
+	//largest = *rect; // First rect in the list
+	//freeRectsBeingConsumed.push_back(rect);
+	rect++;
 
-	// For each rectangle in the iterator's list
-	for (list<Rect>::iterator rect = *iterators; rect != freeList.end() && listLen++ < length; rect++)
+	// Loop through each rectangle in the iterator's list finding rects that are vertically contiguous
+	for (int listLen = 0; rect != freeList.end() && listLen++ < length; rect++)
 	{
 		if (abs(largest.y2 - rect->y1) <= 1 || abs(largest.y1 - rect->y2) <= 1)
 		{
@@ -263,8 +280,8 @@ bool Packer::ComputeVertCaseDimensions(Rect& largest, ListOfIterators::iterator 
 		}
 	}
 
-	if (!EnsureAllIntersect(largest, iterators, length))
-		return false;
+	//if (!EnsureAllIntersect(largest, iterators, length))
+	//	return false;
 
 	return true;
 }

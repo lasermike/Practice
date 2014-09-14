@@ -69,6 +69,10 @@ private:
 	int atlasHeight;
 	int gap;
 
+	// Some helpful temporary state used during Explore
+	int requestedWidth;
+	int requestedHeight;
+
 public:
 	Packer(int width, int height);
 	bool Request(int width, int height, Rect& newRect);
@@ -84,7 +88,7 @@ private:
 
 	bool EnsureAllIntersect(Rect& largest, ListOfIterators::iterator iterators, int length);
 	void Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects);
-	bool Explore(ListOfIterators& permutation, int width, int height, int length, list<Rect>::iterator nextFromFreeList, Rect& newRect);
+	bool Explore(ListOfIterators& permutation, Rect largestHoriz, Rect largestVert, ListOfIterators freeRectsBeingConsumedHoriz, ListOfIterators freeRectsBeingConsumedVert, int length, list<Rect>::iterator nextFromFreeList, Rect& newRect);
 	bool ComputeHorizCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length);
 	bool ComputeVertCaseDimensions(Rect& largest, ListOfIterators::iterator iterators, ListOfIterators& freeRectsBeingConsumed, int length);
 	void ListMaintanceAfterCreate(Rect largest, int width, int height, list<Rect> newFreeRects, ListOfIterators& freeRectsBeingConsumed);

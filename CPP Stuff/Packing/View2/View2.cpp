@@ -44,22 +44,22 @@ void TestCase3(HWND hWnd)
 
 void TestCaseR(HWND hWnd)
 {
-	srand(1);
+	srand(time(NULL));
 
-	_packer = new Packer(100, 100);
+	_packer = new Packer(500, 500);
 	WindowResize(hWnd);
 
 	Rect newRect;
 
-	for (int i = 0; i < 7; i++)
+	for (int i = 0; i < 50; i++)
 	{
-		int height = (int)((rand() / (float)RAND_MAX) * 75) + 10;
-		int width = (height * 4) / 3;
+		int height = (int)((rand() / (float)RAND_MAX) * 100) + 50;
+		int width = (height * 4) / 3; // 4x3
 		if (PackerTest::GetRect(width, height, _packer, newRect))
 		{
 			// Repaint
 			InvalidateRect(hWnd, NULL, TRUE);
-			Sleep(250);
+			Sleep(200);
 		}
 	}
 }
@@ -92,9 +92,9 @@ void TestCase6(HWND hWnd)
 	PackerTest::GetRect(69, 52, _packer, newRect);
 	PackerTest::GetRect(32, 24, _packer, newRect);
 	InvalidateRect(hWnd, NULL, TRUE);
-	Sleep(2000);
+	Sleep(1000);
 
-	PackerTest::GetRect(48, 36, _packer, newRect);
+	PackerTest::GetRect(48, 30, _packer, newRect);
 
 	// Repaint
 	InvalidateRect(hWnd, NULL, TRUE);
@@ -275,7 +275,7 @@ DWORD WINAPI thread_func(LPVOID lpParameter)
 	thread_data *td = (thread_data*)lpParameter;
 	cout << "thread with hWnd = " << td->_hWnd<< endl;
 
-	TestCase6(td->_hWnd);
+	TestCaseR(td->_hWnd);
 
 	return 0;
 }
