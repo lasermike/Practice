@@ -33,6 +33,21 @@ cout << "  rect(" << freeRect->x1 << ", " << freeRect->y1 << ", " << freeRect->x
 
 bool Packer::Request(int width, int height, Rect& newRect)
 {
+	bool retval = RequestInternal(width, height, newRect);
+
+	// Clear queue 
+	while (!bfsQueue.empty())
+	{
+		delete bfsQueue.front();
+		bfsQueue.pop();
+	}
+
+	return retval;
+}
+
+
+bool Packer::RequestInternal(int width, int height, Rect& newRect)
+{
 	list<Rect> newFreeRects;
 	freeListLen = 0;
 	numAttempted++;
@@ -46,10 +61,6 @@ bool Packer::Request(int width, int height, Rect& newRect)
 
 	requestedWidth = width;
 	requestedHeight = height;
-
-	// Erase queue 
-	queue<ExploreData*> empty;
-	swap(bfsQueue, empty);
 
 	// Now try all merging all permutations of rectangles to find a fit
 	// Start by exploring each rectangle individually
@@ -67,7 +78,7 @@ bool Packer::Request(int width, int height, Rect& newRect)
 		list<Rect>::iterator nextFromFreeList = i;
 		nextFromFreeList++;
 
-		ExploreData* data = new ExploreData{
+		ExploreData* data = new ExploreData {
 			permutations,
 			1,
 			largestHoriz,
@@ -86,6 +97,8 @@ bool Packer::Request(int width, int height, Rect& newRect)
 		bfsQueue.pop();
 
 		bool retval = Explore(data, newRect);
+		delete data;
+
 		if (retval)
 		{
 			allocatedList.push_back(newRect);
@@ -137,8 +150,7 @@ bool Packer::Explore(ExploreData* data, Rect& newRect)
 			list<Rect>::iterator nextnextFromFreeList = data->nextFromFreeList;
 			nextnextFromFreeList++;
 
-			ExploreData* nextData = new ExploreData
-			{
+			ExploreData* nextData = new ExploreData {
 				nextPermutation,
 				data->length + 1,
 				data->largestHoriz,
@@ -149,10 +161,6 @@ bool Packer::Explore(ExploreData* data, Rect& newRect)
 			};
 
 			bfsQueue.push(nextData);
-			//bool retval = Explore(nextData, newRect);
-			//bool retval = Explore(nextIterators, length + 1, largestHoriz, largestVert, freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert, nextnextFromFreeList, newRect);
-			//if (retval)
-			//	return true;
 		}
 	}
 	return false;
@@ -305,7 +313,18 @@ void Packer::PackFreeSpace()
 			freeRectsBeingConsumedVert.push_back(i);
 
 			bool horizRect = ComputeHorizCaseDimensions(largestHoriz, j, freeRectsBeingConsumedHoriz);
+			if (horizRect)
+			{
+				if (largestVert.y1 >= largestVert.y2) // Move into Compute Dimensions?
+					horizRect = false;
+			}
+
 			bool vertRect = ComputeVertCaseDimensions(largestVert, j, freeRectsBeingConsumedVert);
+			if (vertRect)
+			{
+				if (largestVert.x1 >= largestVert.x2) // Move into Compute Dimensions?
+					vertRect = false;
+			}
 
 			if (horizRect && vertRect)
 			{
@@ -344,7 +363,6 @@ void Packer::PackFreeSpace()
 		}
 	}
 }
-
 
 bool PackerTest::GetRect(int width, int height, Packer* packer, Rect& newRect)
 {

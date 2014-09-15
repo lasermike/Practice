@@ -74,8 +74,6 @@ private:
 		ListOfRectListIterators freeRectsBeingConsumedHoriz;
 		ListOfRectListIterators freeRectsBeingConsumedVert;
 		list<Rect>::iterator nextFromFreeList;
-
-		~ExploreData() { delete permutation; }
 	};
 
 	list<Rect> freeList;
@@ -91,6 +89,7 @@ private:
 	int requestedHeight;
 	queue<ExploreData*> bfsQueue;
 
+	bool RequestInternal(int width, int height, Rect& newRect);
 	bool Explore(ExploreData* data, Rect& newRect);
 	void PackFreeSpace();
 	bool EvaluateLargest(Rect largestHoriz, ListOfRectListIterators& freeRectsBeingConsumed, Rect& newRect);
