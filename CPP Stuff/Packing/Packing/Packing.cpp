@@ -6,7 +6,8 @@
 #include <iostream> 
 #include <algorithm> 
 #include <list>
-
+#include <queue>
+#include <memory>
 #include "packing.h"
 
 
@@ -26,7 +27,7 @@ void Packer::OutputFree()
 	cout << "Free list\n";
 	for (list<Rect>::iterator freeRect = freeList.begin(); freeRect != freeList.end(); freeRect++)
 	{
-		cout << "  rect(" << freeRect->x1 << ", " << freeRect->y1 << ", " << freeRect->x2 << ", " << freeRect->y2 << ")\n";
+cout << "  rect(" << freeRect->x1 << ", " << freeRect->y1 << ", " << freeRect->x2 << ", " << freeRect->y2 << ")\n";
 	}
 }
 
@@ -40,23 +41,15 @@ bool Packer::Request(int width, int height, Rect& newRect)
 	// This whole case is unnecessary because the later Explore function will cover the same data set
 	for (list<Rect>::iterator freeRect = freeList.begin(); freeRect != freeList.end(); freeRect++)
 	{
-		if (TryCreateSubRect(*freeRect, width, height, newRect))
-		{
-			// Clip all consumed rects by the newly allocated rect
-			Clip(newRect, *freeRect, newFreeRects);
-
-			//newRect = Rect(freeRect->x1, freeRect->y1, freeRect->x1 + width, freeRect->y1 + height);
-			for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
-				freeList.push_back(*newFreeRectIter);
-			freeList.erase(freeRect);
-			allocatedList.push_back(newRect);
-			return true;
-		}
 		freeListLen++;
 	}
 
 	requestedWidth = width;
 	requestedHeight = height;
+
+	// Erase queue 
+	queue<ExploreData*> empty;
+	swap(bfsQueue, empty);
 
 	// Now try all merging all permutations of rectangles to find a fit
 	// Start by exploring each rectangle individually
@@ -65,23 +58,188 @@ bool Packer::Request(int width, int height, Rect& newRect)
 		// Base recursion data
 		Rect largestHoriz = *i;
 		Rect largestVert = *i;
-		ListOfIterators freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert;
+		ListOfRectListIterators freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert;
 		freeRectsBeingConsumedHoriz.push_back(i);
 		freeRectsBeingConsumedVert.push_back(i);
 
-		ListOfIterators iterators;
-		iterators.push_back(i);
+		ListOfRectListIterators* permutations = new ListOfRectListIterators();
+		permutations->push_back(i);
 		list<Rect>::iterator nextFromFreeList = i;
-
 		nextFromFreeList++;
-		bool retval = Explore(iterators, 1, largestHoriz, largestVert, freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert, nextFromFreeList, newRect);
+
+		ExploreData* data = new ExploreData{
+			permutations,
+			1,
+			largestHoriz,
+			largestVert,
+			freeRectsBeingConsumedHoriz,
+			freeRectsBeingConsumedVert,
+			nextFromFreeList
+		};
+		bfsQueue.push(data);
+
+	}
+
+	while (bfsQueue.size() > 0)
+	{
+		ExploreData* data = bfsQueue.front();
+		bfsQueue.pop();
+
+		bool retval = Explore(data, newRect);
 		if (retval)
 		{
 			allocatedList.push_back(newRect);
+			//PackFreeSpace();
 			return true;
 		}
 	}
 
+	return false;
+}
+
+bool Packer::Explore(ExploreData* data, Rect& newRect)
+{
+	// Find the maximum size of contiguous rectangles favoring width
+	// Also handles the base case of single rect/no combining
+	if (ComputeHorizCaseDimensions(data->largestHoriz, *(data->permutation->rbegin()), data->freeRectsBeingConsumedHoriz) || data->length == 1)
+	{
+		if (EvaluateLargest(data->largestHoriz, data->freeRectsBeingConsumedHoriz, newRect))
+		{
+			return true;
+		}
+	}
+
+	// Find the maximum size of contiguous rectangles favoring height
+	if (ComputeVertCaseDimensions(data->largestVert, *(data->permutation->rbegin()), data->freeRectsBeingConsumedVert))
+	{
+		if (EvaluateLargest(data->largestVert, data->freeRectsBeingConsumedVert, newRect))
+		{
+			return true;
+		}
+	}
+
+	// Didn't find any of this run length, so explore the next length of each permutation
+	if (data->length < freeListLen)
+	{
+		for (ListOfRectListIterators::iterator i = data->permutation->begin(); i != data->permutation->end(); i++)
+		{
+			if (data->nextFromFreeList == freeList.end())  // Out of permutations to explore in this branch
+				return false;
+
+			// Copy iterator list.  Source of perf hit!!
+			ListOfRectListIterators* nextPermutation = new ListOfRectListIterators();
+			for (auto j = data->permutation->begin(); j != data->permutation->end(); j++)
+			{
+				nextPermutation->push_back(*j);
+			}
+			nextPermutation->push_back(data->nextFromFreeList);
+
+			list<Rect>::iterator nextnextFromFreeList = data->nextFromFreeList;
+			nextnextFromFreeList++;
+
+			ExploreData* nextData = new ExploreData
+			{
+				nextPermutation,
+				data->length + 1,
+				data->largestHoriz,
+				data->largestVert,
+				data->freeRectsBeingConsumedHoriz,
+				data->freeRectsBeingConsumedVert,
+				nextnextFromFreeList
+			};
+
+			bfsQueue.push(nextData);
+			//bool retval = Explore(nextData, newRect);
+			//bool retval = Explore(nextIterators, length + 1, largestHoriz, largestVert, freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert, nextnextFromFreeList, newRect);
+			//if (retval)
+			//	return true;
+		}
+	}
+	return false;
+}
+
+bool Packer::EvaluateLargest(Rect largestHoriz, ListOfRectListIterators& freeRectsBeingConsumed, Rect& newRect)
+{
+	// Try creating rect
+	list<Rect> newFreeRects;
+	if (TryCreateSubRect(largestHoriz, requestedWidth, requestedHeight, newRect))
+	{
+		// Clip this rect by the largest region rect
+		Rect remainingLargest = largestHoriz;
+		for (ListOfRectListIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
+		{
+			// Clip all consumed rects by the newly allocated rect
+			Clip(newRect, *(*i), newFreeRects);
+		}
+		ListMaintanceAfterCreate(largestHoriz, newFreeRects, freeRectsBeingConsumed);
+		return true;
+	}
+
+	return false;
+}
+
+
+// Rect of form
+//  X                             X
+//  XYYY                       YYYX
+//  X                             X
+bool Packer::ComputeHorizCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed)
+{
+	if (abs(largest.x2 - rect->x1) <= 1 || abs(largest.x1 - rect->x2) <= 1)
+	{
+		largest.x1 = min(largest.x1, rect->x1);
+		largest.y1 = max(largest.y1, rect->y1);
+		largest.x2 = max(largest.x2, rect->x2);
+		largest.y2 = min(largest.y2, rect->y2);
+		freeRectsBeingConsumed.push_back(rect);
+		return true;
+	}
+
+	if (largest.Equals(*rect))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+// Rect of form
+//     X             YYY
+//     X              X
+//    YYY             X
+bool Packer::ComputeVertCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed)
+{
+	if (abs(largest.y2 - rect->y1) <= 1 || abs(largest.y1 - rect->y2) <= 1)
+	{
+		largest.x1 = max(largest.x1, rect->x1);
+		largest.y1 = min(largest.y1, rect->y1);
+		largest.x2 = min(largest.x2, rect->x2);
+		largest.y2 = max(largest.y2, rect->y2);
+		freeRectsBeingConsumed.push_back(rect);
+		return true;
+	}
+
+	return false;
+}
+
+void Packer::ListMaintanceAfterCreate(Rect largest, list<Rect> newFreeRects, ListOfRectListIterators& freeRectsBeingConsumed)
+{
+	// Add new clipped free rects resulting from the chop
+	for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
+		freeList.push_back(*newFreeRectIter);
+
+	// Remove rectangles that were chopped
+	for (ListOfRectListIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
+		freeList.erase(*i);
+}
+
+bool Packer::TryCreateSubRect(Rect largest, int width, int height, Rect& newRect)
+{
+	if (largest.x2 - largest.x1 >= width && largest.y2 - largest.y1 >= height)
+	{
+		newRect = Rect(largest.x1, largest.y1, largest.x1 + width, largest.y1 + height);
+		return true;
+	}
 	return false;
 }
 
@@ -129,125 +287,63 @@ void Packer::Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
 	}
 }
 
-bool Packer::Explore(ListOfIterators& permutation, int length, Rect largestHoriz, Rect largestVert, ListOfIterators& freeRectsBeingConsumedHoriz, ListOfIterators& freeRectsBeingConsumedVert, list<Rect>::iterator nextFromFreeList, Rect& newRect)
+void Packer::PackFreeSpace()
 {
-	// Find the maximum size of contiguous rectangles favoring width
-	if (ComputeHorizCaseDimensions(largestHoriz, *(permutation.rbegin()), freeRectsBeingConsumedHoriz, length))
+	// For all pairs of rects, find largest size
+	for (list<Rect>::iterator i = freeList.begin(); i != freeList.end(); i++)
 	{
-		// Try creating rect
-		list<Rect> newFreeRects;
-		if (TryCreateSubRect(largestHoriz, requestedWidth, requestedHeight, newRect))
+		for (list<Rect>::iterator j = i; j != freeList.end(); j++)
 		{
-			// Clip this rect by the largest region rect
-			Rect remainingLargest = largestHoriz;
-			for (ListOfIterators::iterator i = freeRectsBeingConsumedHoriz.begin(); i != freeRectsBeingConsumedHoriz.end(); i++)
+			// No sense combining with yourself
+			if (i == j)
+				continue;
+
+			Rect largest, largestVert, largestHoriz = largestVert = *i;
+			ListOfRectListIterators freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert;
+			ListOfRectListIterators* freeRectsBeingConsumed = NULL;
+			freeRectsBeingConsumedHoriz.push_back(i);
+			freeRectsBeingConsumedVert.push_back(i);
+
+			bool horizRect = ComputeHorizCaseDimensions(largestHoriz, j, freeRectsBeingConsumedHoriz);
+			bool vertRect = ComputeVertCaseDimensions(largestVert, j, freeRectsBeingConsumedVert);
+
+			if (horizRect && vertRect)
 			{
-				// Clip all consumed rects by the newly allocated rect
-				Clip(newRect, *(*i), newFreeRects);
+				if (largestHoriz.Size() > largestVert.Size())
+				{
+					vertRect = false;
+				}
+				else
+				{
+					horizRect = false;
+				}
 			}
-			ListMaintanceAfterCreate(largestHoriz, requestedWidth, requestedHeight, newFreeRects, freeRectsBeingConsumedHoriz);
-			return true;
-		}
-	}
 
-	// Find the maximum size of contiguous rectangles favoring height
-	if (ComputeVertCaseDimensions(largestVert, *(permutation.rbegin()), freeRectsBeingConsumedVert, length))
-	{
-		// Try creating rect
-		list<Rect> newFreeRects;
-		if (TryCreateSubRect(largestVert, requestedWidth, requestedHeight, newRect))
-		{
-			for (ListOfIterators::iterator i = freeRectsBeingConsumedVert.begin(); i != freeRectsBeingConsumedVert.end(); i++)
+			if (horizRect)
 			{
-				// Clip all consumed rects by the newly allocated rect
-				Clip(newRect, *(*i), newFreeRects);
+				largest = largestHoriz;
+				freeRectsBeingConsumed = &freeRectsBeingConsumedHoriz;
 			}
-			ListMaintanceAfterCreate(largestVert, requestedWidth, requestedHeight, newFreeRects, freeRectsBeingConsumedVert);
-			return true;
+
+			if (vertRect)
+			{
+				largest = largestVert;
+				freeRectsBeingConsumed = &freeRectsBeingConsumedVert;
+			}
+
+			if (horizRect || vertRect)
+			{
+				list<Rect> newFreeRects;
+				Clip(largest, *i, newFreeRects);
+				Clip(largest, *j, newFreeRects);
+				newFreeRects.push_back(largest);
+				ListMaintanceAfterCreate(largestHoriz, newFreeRects, *freeRectsBeingConsumed);
+				return;
+			}
+
 		}
 	}
-
-	// Didn't find any of this run length, so explore the next length of each permutation
-	if (length < freeListLen)
-	{
-		for (ListOfIterators::iterator i = permutation.begin(); i != permutation.end(); i++)
-		{
-			if (nextFromFreeList == freeList.end())  // Out of permutations to explore in this branch
-				return false;
-
-			// Copy iterator list
-			ListOfIterators nextIterators(permutation);
-
-			nextIterators.push_back(nextFromFreeList);
-			list<Rect>::iterator nextnextFromFreeList = nextFromFreeList;
-			nextnextFromFreeList++;
-			bool retval = Explore(nextIterators, length + 1, largestHoriz, largestVert, freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert, nextnextFromFreeList, newRect);
-			if (retval)
-				return true;
-		}
-	}
-	return false;
 }
-
-// Rect of form
-//  X                             X
-//  XYYY                       YYYX
-//  X                             X
-bool Packer::ComputeHorizCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfIterators& freeRectsBeingConsumed, int length)
-{
-	if (abs(largest.x2 - rect->x1) <= 1 || abs(largest.x1 - rect->x2) <= 1)
-	{
-		largest.x1 = min(largest.x1, rect->x1);
-		largest.y1 = max(largest.y1, rect->y1);
-		largest.x2 = max(largest.x2, rect->x2);
-		largest.y2 = min(largest.y2, rect->y2);
-		freeRectsBeingConsumed.push_back(rect);
-		return true;
-	}
-
-	return false;
-}
-
-// Rect of form
-//     X             YYY
-//     X              X
-//    YYY             X
-bool Packer::ComputeVertCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfIterators& freeRectsBeingConsumed, int length)
-{
-	if (abs(largest.y2 - rect->y1) <= 1 || abs(largest.y1 - rect->y2) <= 1)
-	{
-		largest.x1 = max(largest.x1, rect->x1);
-		largest.y1 = min(largest.y1, rect->y1);
-		largest.x2 = min(largest.x2, rect->x2);
-		largest.y2 = max(largest.y2, rect->y2);
-		freeRectsBeingConsumed.push_back(rect);
-		return true;
-	}
-
-	return false;
-}
-
-void Packer::ListMaintanceAfterCreate(Rect largest, int width, int height, list<Rect> newFreeRects, ListOfIterators& freeRectsBeingConsumed)
-{
-	// Add new clipped free rects resulting from the chop
-	for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
-		freeList.push_back(*newFreeRectIter);
-
-	// Remove rectangles that were chopped
-	for (ListOfIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
-		freeList.erase(*i);
-}
-
-bool Packer::TryCreateSubRect(Rect largest, int width, int height, Rect& newRect)
-{
-	if (largest.x2 - largest.x1 >= width && largest.y2 - largest.y1 >= height)
-	{
-		newRect = Rect(largest.x1, largest.y1, largest.x1 + width, largest.y1 + height);
-		return true;
-	}
-	return false;
-}
-
 
 
 bool PackerTest::GetRect(int width, int height, Packer* packer, Rect& newRect)

@@ -1,5 +1,6 @@
 
 #include <list>
+#include <queue>
 #include <iostream>
 using namespace std;
 
@@ -35,25 +36,18 @@ struct Rect
 	}
 
 	int x1, y1, x2, y2;
+
+	const int Size()
+	{
+		return (x2 - x1) * (y2 - y1);
+	}
+
 };
 
-typedef list<list<Rect>::iterator> ListOfIterators;
+typedef list<list<Rect>::iterator> ListOfRectListIterators;
 
 class Packer
 {
-private:
-	list<Rect> freeList;
-	list<Rect> allocatedList;
-	int freeListLen;
-	int atlasWidth;
-	int atlasHeight;
-	int gap;
-	int numAttempted;
-
-	// Some helpful temporary state used during Explore
-	int requestedWidth;
-	int requestedHeight;
-
 public:
 	Packer(int width, int height);
 
@@ -71,13 +65,40 @@ public:
 
 private:
 
-	void Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects);
-	bool Explore(ListOfIterators& permutation, int length, Rect largestHoriz, Rect largestVert, ListOfIterators& freeRectsBeingConsumedHoriz, ListOfIterators& freeRectsBeingConsumedVert, list<Rect>::iterator nextFromFreeList, Rect& newRect);
-	bool ComputeHorizCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfIterators& freeRectsBeingConsumed, int length);
-	bool ComputeVertCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfIterators& freeRectsBeingConsumed, int length);
-	void ListMaintanceAfterCreate(Rect largest, int width, int height, list<Rect> newFreeRects, ListOfIterators& freeRectsBeingConsumed);
-	bool TryCreateSubRect(Rect largest, int width, int height, Rect& newRect);
+	struct ExploreData
+	{
+		ListOfRectListIterators* permutation;
+		int length;
+		Rect largestHoriz;
+		Rect largestVert;
+		ListOfRectListIterators freeRectsBeingConsumedHoriz;
+		ListOfRectListIterators freeRectsBeingConsumedVert;
+		list<Rect>::iterator nextFromFreeList;
 
+		~ExploreData() { delete permutation; }
+	};
+
+	list<Rect> freeList;
+	list<Rect> allocatedList;
+	int freeListLen;
+	int atlasWidth;
+	int atlasHeight;
+	int gap;
+	int numAttempted;
+
+	// Some helpful temporary state used during Explore
+	int requestedWidth;
+	int requestedHeight;
+	queue<ExploreData*> bfsQueue;
+
+	bool Explore(ExploreData* data, Rect& newRect);
+	void PackFreeSpace();
+	bool EvaluateLargest(Rect largestHoriz, ListOfRectListIterators& freeRectsBeingConsumed, Rect& newRect);
+	bool ComputeHorizCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed);
+	bool ComputeVertCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed);
+	bool TryCreateSubRect(Rect largest, int width, int height, Rect& newRect);
+	void Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects);
+	void ListMaintanceAfterCreate(Rect largest, list<Rect> newFreeRects, ListOfRectListIterators& freeRectsBeingConsumed);
 };
 
 
