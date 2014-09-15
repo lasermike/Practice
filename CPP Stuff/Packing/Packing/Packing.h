@@ -37,7 +37,7 @@ struct Rect
 
 	int x1, y1, x2, y2;
 
-	const int Size()
+	const int Size() const
 	{
 		return (x2 - x1) * (y2 - y1);
 	}
@@ -89,15 +89,17 @@ private:
 	int requestedHeight;
 	queue<ExploreData*> bfsQueue;
 
-	bool RequestInternal(int width, int height, Rect& newRect);
+	bool RequestInternal(int width, int height, Rect& newRect, bool consolidatePass);
 	bool Explore(ExploreData* data, Rect& newRect);
-	void PackFreeSpace();
 	bool EvaluateLargest(Rect largestHoriz, ListOfRectListIterators& freeRectsBeingConsumed, Rect& newRect);
 	bool ComputeHorizCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed);
 	bool ComputeVertCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed);
 	bool TryCreateSubRect(Rect largest, int width, int height, Rect& newRect);
 	void Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects);
 	void ListMaintanceAfterCreate(Rect largest, list<Rect> newFreeRects, ListOfRectListIterators& freeRectsBeingConsumed);
+	void RepositionAllocated(Rect& newRect);
+	void PackFreeSpaceDefunct();
+	void ClearBFSQueue();
 };
 
 

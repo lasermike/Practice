@@ -32,17 +32,17 @@ double GetCounter();
 
 void TestCaseR(HWND hWnd)
 {
-	srand(3);  // time(NULL));
+	srand((unsigned)time(NULL));
 
- 
 	_packer = new Packer(500, 500);
 	WindowResize(hWnd);
 
 	Rect newRect;
 
-	for (int i = 0; i < 11; i++)
+	for (int i = 0; i < 20; i++)
 	{
-		int height = (int)((rand() / (float)RAND_MAX) * 200) + 50;
+		//int height = (int)((rand() / (float)RAND_MAX) * 20) + 100;
+		int height = (int)((rand() / (float)RAND_MAX) * 100) + 50;
 		int width = (height * 4) / 3; // 4x3
 		if (PackerTest::GetRect(width, height, _packer, newRect))
 		{
@@ -52,6 +52,7 @@ void TestCaseR(HWND hWnd)
 		}
 	}
 }
+
 
 void TestCase3(HWND hWnd)
 {
@@ -263,11 +264,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
-
    BOOL consoleShown = AllocConsole();
    freopen("CONOUT$", "w", stdout);
+
+   ShowWindow(hWnd, nCmdShow);
+   UpdateWindow(hWnd);
 
    return TRUE;
 }

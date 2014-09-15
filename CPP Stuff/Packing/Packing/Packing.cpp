@@ -33,20 +33,21 @@ cout << "  rect(" << freeRect->x1 << ", " << freeRect->y1 << ", " << freeRect->x
 
 bool Packer::Request(int width, int height, Rect& newRect)
 {
-	bool retval = RequestInternal(width, height, newRect);
+	bool retval = RequestInternal(width, height, newRect, false);
+	return retval;
+}
 
+void Packer::ClearBFSQueue()
+{
 	// Clear queue 
 	while (!bfsQueue.empty())
 	{
 		delete bfsQueue.front();
 		bfsQueue.pop();
 	}
-
-	return retval;
 }
 
-
-bool Packer::RequestInternal(int width, int height, Rect& newRect)
+bool Packer::RequestInternal(int width, int height, Rect& newRect, bool consolidatePass)
 {
 	list<Rect> newFreeRects;
 	freeListLen = 0;
@@ -102,10 +103,15 @@ bool Packer::RequestInternal(int width, int height, Rect& newRect)
 		if (retval)
 		{
 			allocatedList.push_back(newRect);
-			//PackFreeSpace();
+			ClearBFSQueue();
+
+			if (!consolidatePass)
+				RepositionAllocated(newRect);
 			return true;
 		}
 	}
+
+	ClearBFSQueue();
 
 	return false;
 }
@@ -295,7 +301,37 @@ void Packer::Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects)
 	}
 }
 
-void Packer::PackFreeSpace()
+bool compare_rect(const Rect& first, const Rect& second)
+{
+	return first.Size() > second.Size();
+}
+
+// Reposition all allocated rects sorted with the largest in the top most corner
+void Packer::RepositionAllocated(Rect& newRect)
+{
+	list<Rect> sorted(allocatedList);
+	sorted.sort(compare_rect);
+
+	allocatedList.clear();
+	freeList.clear();
+	freeList.push_back(Rect(0, 0, atlasWidth, atlasHeight)); // -1 ?
+
+	for (list<Rect>::iterator i = sorted.begin(); i != sorted.end(); i++)
+	{
+		Rect newNewRect;
+		bool retval = RequestInternal(i->Width(), i->Height(), newNewRect, true);
+		if (!retval)
+			cout << "RepositionAllocated: ERROR rect that fit before does not fit now!";
+		else
+		{
+			// Return the repositioned newly allocated rect
+			if (i->Equals(newRect))
+				newRect = newNewRect;
+		}
+	}
+}
+
+void Packer::PackFreeSpaceDefunct()
 {
 	// For all pairs of rects, find largest size
 	for (list<Rect>::iterator i = freeList.begin(); i != freeList.end(); i++)
@@ -315,7 +351,9 @@ void Packer::PackFreeSpace()
 			bool horizRect = ComputeHorizCaseDimensions(largestHoriz, j, freeRectsBeingConsumedHoriz);
 			if (horizRect)
 			{
-				if (largestVert.y1 >= largestVert.y2) // Move into Compute Dimensions?
+				if (largestHoriz.y1 >= largestHoriz.y2) // Move into Compute Dimensions?
+					horizRect = false;
+				if (largestHoriz.Size() <= i->Size() || largestHoriz.Size() <= j->Size())
 					horizRect = false;
 			}
 
@@ -323,6 +361,8 @@ void Packer::PackFreeSpace()
 			if (vertRect)
 			{
 				if (largestVert.x1 >= largestVert.x2) // Move into Compute Dimensions?
+					vertRect = false;
+				if (largestVert.Size() <= i->Size() || largestVert.Size() <= j->Size())
 					vertRect = false;
 			}
 
