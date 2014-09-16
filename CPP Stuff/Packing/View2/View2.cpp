@@ -346,6 +346,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_DESTROY:
+		if (_packer)
+			_packer->Abort();
 		if (paintThread)
 			paintThread->join();
 		PostQuitMessage(0);

@@ -20,6 +20,7 @@ Packer::Packer(int width, int height)
 	Rect rect(0, 0, atlasWidth, atlasHeight);
 	freeList.push_back(rect);
 	numAttempted = 0;
+	abort = false;
 }
 
 void Packer::OutputFree()
@@ -34,17 +35,10 @@ cout << "  rect(" << freeRect->x1 << ", " << freeRect->y1 << ", " << freeRect->x
 bool Packer::Request(int width, int height, Rect& newRect)
 {
 	bool retval = RequestInternal(width, height, newRect, false);
-	return retval;
-}
+	ClearBFSQueue();
+	FreeExploreDataHeap();
 
-void Packer::ClearBFSQueue()
-{
-	// Clear queue 
-	while (!bfsQueue.empty())
-	{
-		delete bfsQueue.front();
-		bfsQueue.pop();
-	}
+	return retval;
 }
 
 bool Packer::RequestInternal(int width, int height, Rect& newRect, bool consolidatePass)
@@ -67,19 +61,20 @@ bool Packer::RequestInternal(int width, int height, Rect& newRect, bool consolid
 	// Start by exploring each rectangle individually
 	for (list<Rect>::iterator i = freeList.begin(); i != freeList.end(); i++)
 	{
-		// Base recursion data
+		// Base exploration data
 		Rect largestHoriz = *i;
 		Rect largestVert = *i;
-		ListOfRectListIterators freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert;
-		freeRectsBeingConsumedHoriz.push_back(i);
-		freeRectsBeingConsumedVert.push_back(i);
-
+		list<Rect>* freeRectsBeingConsumedHoriz = new list<Rect>();
+		list<Rect>* freeRectsBeingConsumedVert = new list<Rect>();
+		freeRectsBeingConsumedHoriz->push_back(*i);
+		freeRectsBeingConsumedVert->push_back(*i);
 		ListOfRectListIterators* permutations = new ListOfRectListIterators();
 		permutations->push_back(i);
 		list<Rect>::iterator nextFromFreeList = i;
 		nextFromFreeList++;
 
-		ExploreData* data = new ExploreData {
+		ExploreData* data = AllocateExploreData();
+		*data = ExploreData {
 			permutations,
 			1,
 			largestHoriz,
@@ -89,16 +84,16 @@ bool Packer::RequestInternal(int width, int height, Rect& newRect, bool consolid
 			nextFromFreeList
 		};
 		bfsQueue.push(data);
-
 	}
 
-	while (bfsQueue.size() > 0)
+	// Explore!
+	while (bfsQueue.size() > 0 && !abort)
 	{
 		ExploreData* data = bfsQueue.front();
 		bfsQueue.pop();
 
-		bool retval = Explore(data, newRect);
-		delete data;
+		bool retval = EvaluatePermuation(data, newRect);
+		exploreDataHeap.push_back(data);
 
 		if (retval)
 		{
@@ -114,16 +109,14 @@ bool Packer::RequestInternal(int width, int height, Rect& newRect, bool consolid
 		}
 	}
 
-	ClearBFSQueue();
-
 	return false;
 }
 
-bool Packer::Explore(ExploreData* data, Rect& newRect)
+bool Packer::EvaluatePermuation(ExploreData* data, Rect& newRect)
 {
 	// Find the maximum size of contiguous rectangles favoring width
 	// Also handles the base case of single rect/no combining
-	if (ComputeHorizCaseDimensions(data->largestHoriz, *(data->permutation->rbegin()), data->freeRectsBeingConsumedHoriz) || data->length == 1)
+	if (ComputeHorizCaseDimensions(data->largestHoriz, *(*(data->permutation->rbegin())), data->freeRectsBeingConsumedHoriz) || data->length == 1)
 	{
 		if (EvaluateLargest(data->largestHoriz, data->freeRectsBeingConsumedHoriz, newRect))
 		{
@@ -132,7 +125,7 @@ bool Packer::Explore(ExploreData* data, Rect& newRect)
 	}
 
 	// Find the maximum size of contiguous rectangles favoring height
-	if (ComputeVertCaseDimensions(data->largestVert, *(data->permutation->rbegin()), data->freeRectsBeingConsumedVert))
+	if (ComputeVertCaseDimensions(data->largestVert, *(*(data->permutation->rbegin())), data->freeRectsBeingConsumedVert))
 	{
 		if (EvaluateLargest(data->largestVert, data->freeRectsBeingConsumedVert, newRect))
 		{
@@ -140,7 +133,7 @@ bool Packer::Explore(ExploreData* data, Rect& newRect)
 		}
 	}
 
-	// Didn't find any of this run length, so explore the next length of each permutation
+	// Didn't find any of this run length, so explore the next length of this permutation
 	if (data->length < freeListLen)
 	{
 		for (ListOfRectListIterators::iterator i = data->permutation->begin(); i != data->permutation->end(); i++)
@@ -159,7 +152,8 @@ bool Packer::Explore(ExploreData* data, Rect& newRect)
 			list<Rect>::iterator nextnextFromFreeList = data->nextFromFreeList;
 			nextnextFromFreeList++;
 
-			ExploreData* nextData = new ExploreData {
+			ExploreData* nextData = AllocateExploreData();
+			*nextData = ExploreData {
 				nextPermutation,
 				data->length + 1,
 				data->largestHoriz,
@@ -175,7 +169,7 @@ bool Packer::Explore(ExploreData* data, Rect& newRect)
 	return false;
 }
 
-bool Packer::EvaluateLargest(Rect largestHoriz, ListOfRectListIterators& freeRectsBeingConsumed, Rect& newRect)
+bool Packer::EvaluateLargest(Rect largestHoriz, list<Rect>* freeRectsBeingConsumed, Rect& newRect)
 {
 	// Try creating rect
 	list<Rect> newFreeRects;
@@ -183,10 +177,10 @@ bool Packer::EvaluateLargest(Rect largestHoriz, ListOfRectListIterators& freeRec
 	{
 		// Clip this rect by the largest region rect
 		Rect remainingLargest = largestHoriz;
-		for (ListOfRectListIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
+		for (auto i = freeRectsBeingConsumed->begin(); i != freeRectsBeingConsumed->end(); i++)
 		{
 			// Clip all consumed rects by the newly allocated rect
-			Clip(newRect, *(*i), newFreeRects);
+			Clip(newRect, *i, newFreeRects);
 		}
 		ListMaintanceAfterCreate(largestHoriz, newFreeRects, freeRectsBeingConsumed);
 		return true;
@@ -200,19 +194,20 @@ bool Packer::EvaluateLargest(Rect largestHoriz, ListOfRectListIterators& freeRec
 //  X                             X
 //  XYYY                       YYYX
 //  X                             X
-bool Packer::ComputeHorizCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed)
+bool Packer::ComputeHorizCaseDimensions(Rect& largest, Rect rect, list<Rect>* freeRectsBeingConsumed)
 {
-	if (abs(largest.x2 - rect->x1) <= 1 || abs(largest.x1 - rect->x2) <= 1)
+	if (abs(largest.x2 - rect.x1) <= 1 || abs(largest.x1 - rect.x2) <= 1)
 	{
-		largest.x1 = min(largest.x1, rect->x1);
-		largest.y1 = max(largest.y1, rect->y1);
-		largest.x2 = max(largest.x2, rect->x2);
-		largest.y2 = min(largest.y2, rect->y2);
-		freeRectsBeingConsumed.push_back(rect);
+		largest.x1 = min(largest.x1, rect.x1);
+		largest.y1 = max(largest.y1, rect.y1);
+		largest.x2 = max(largest.x2, rect.x2);
+		largest.y2 = min(largest.y2, rect.y2);
+		freeRectsBeingConsumed->push_back(rect);
 		return true;
 	}
 
-	if (largest.Equals(*rect))
+	// Base length = 1 case
+	if (largest.Equals(rect))
 	{
 		return true;
 	}
@@ -224,30 +219,42 @@ bool Packer::ComputeHorizCaseDimensions(Rect& largest, list<Rect>::iterator rect
 //     X             YYY
 //     X              X
 //    YYY             X
-bool Packer::ComputeVertCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed)
+bool Packer::ComputeVertCaseDimensions(Rect& largest, Rect rect, list<Rect>* freeRectsBeingConsumed)
 {
-	if (abs(largest.y2 - rect->y1) <= 1 || abs(largest.y1 - rect->y2) <= 1)
+	if (abs(largest.y2 - rect.y1) <= 1 || abs(largest.y1 - rect.y2) <= 1)
 	{
-		largest.x1 = max(largest.x1, rect->x1);
-		largest.y1 = min(largest.y1, rect->y1);
-		largest.x2 = min(largest.x2, rect->x2);
-		largest.y2 = max(largest.y2, rect->y2);
-		freeRectsBeingConsumed.push_back(rect);
+		largest.x1 = max(largest.x1, rect.x1);
+		largest.y1 = min(largest.y1, rect.y1);
+		largest.x2 = min(largest.x2, rect.x2);
+		largest.y2 = max(largest.y2, rect.y2);
+		freeRectsBeingConsumed->push_back(rect);
 		return true;
 	}
 
 	return false;
 }
 
-void Packer::ListMaintanceAfterCreate(Rect largest, list<Rect> newFreeRects, ListOfRectListIterators& freeRectsBeingConsumed)
+void Packer::EraseFromFreeList(Rect rect)
+{
+	for (auto i = freeList.begin(); i != freeList.end(); i++)
+	{
+		if (i->Equals(rect))
+		{
+			freeList.erase(i);
+			return;
+		}
+	}
+}
+
+void Packer::ListMaintanceAfterCreate(Rect largest, list<Rect> newFreeRects, list<Rect>* freeRectsBeingConsumed)
 {
 	// Add new clipped free rects resulting from the chop
 	for (auto newFreeRectIter = newFreeRects.begin(); newFreeRectIter != newFreeRects.end(); newFreeRectIter++)
 		freeList.push_back(*newFreeRectIter);
 
 	// Remove rectangles that were chopped
-	for (ListOfRectListIterators::iterator i = freeRectsBeingConsumed.begin(); i != freeRectsBeingConsumed.end(); i++)
-		freeList.erase(*i);
+	for (auto i = freeRectsBeingConsumed->begin(); i != freeRectsBeingConsumed->end(); i++)
+		EraseFromFreeList(*i);
 }
 
 bool Packer::TryCreateSubRect(Rect largest, int width, int height, Rect& newRect)
@@ -347,12 +354,13 @@ void Packer::PackFreeSpaceDefunct()
 				continue;
 
 			Rect largest, largestVert, largestHoriz = largestVert = *i;
-			ListOfRectListIterators freeRectsBeingConsumedHoriz, freeRectsBeingConsumedVert;
-			ListOfRectListIterators* freeRectsBeingConsumed = NULL;
-			freeRectsBeingConsumedHoriz.push_back(i);
-			freeRectsBeingConsumedVert.push_back(i);
+			list<Rect>* freeRectsBeingConsumedHoriz = new list<Rect>();
+			list<Rect>* freeRectsBeingConsumedVert = new list<Rect>();
+			list<Rect>* freeRectsBeingConsumed = NULL;
+			freeRectsBeingConsumedHoriz->push_back(*i);
+			freeRectsBeingConsumedVert->push_back(*i);
 
-			bool horizRect = ComputeHorizCaseDimensions(largestHoriz, j, freeRectsBeingConsumedHoriz);
+			bool horizRect = ComputeHorizCaseDimensions(largestHoriz, *j, freeRectsBeingConsumedHoriz);
 			if (horizRect)
 			{
 				if (largestHoriz.y1 >= largestHoriz.y2) // Move into Compute Dimensions?
@@ -361,7 +369,7 @@ void Packer::PackFreeSpaceDefunct()
 					horizRect = false;
 			}
 
-			bool vertRect = ComputeVertCaseDimensions(largestVert, j, freeRectsBeingConsumedVert);
+			bool vertRect = ComputeVertCaseDimensions(largestVert, *j, freeRectsBeingConsumedVert);
 			if (vertRect)
 			{
 				if (largestVert.x1 >= largestVert.x2) // Move into Compute Dimensions?
@@ -385,13 +393,13 @@ void Packer::PackFreeSpaceDefunct()
 			if (horizRect)
 			{
 				largest = largestHoriz;
-				freeRectsBeingConsumed = &freeRectsBeingConsumedHoriz;
+				freeRectsBeingConsumed = freeRectsBeingConsumedHoriz;
 			}
 
 			if (vertRect)
 			{
 				largest = largestVert;
-				freeRectsBeingConsumed = &freeRectsBeingConsumedVert;
+				freeRectsBeingConsumed = freeRectsBeingConsumedVert;
 			}
 
 			if (horizRect || vertRect)
@@ -400,7 +408,7 @@ void Packer::PackFreeSpaceDefunct()
 				Clip(largest, *i, newFreeRects);
 				Clip(largest, *j, newFreeRects);
 				newFreeRects.push_back(largest);
-				ListMaintanceAfterCreate(largestHoriz, newFreeRects, *freeRectsBeingConsumed);
+				ListMaintanceAfterCreate(largestHoriz, newFreeRects, freeRectsBeingConsumed);
 			}
 		}
 	}
@@ -438,6 +446,40 @@ bool Packer::CheckFree(Rect rect)
 	return false;
 }
 
+void Packer::ClearBFSQueue()
+{
+	// Clear queue 
+	while (!bfsQueue.empty())
+	{
+		delete bfsQueue.front();
+		bfsQueue.pop();
+	}
+}
+
+
+void Packer::FreeExploreDataHeap()
+{
+	// Clear list 
+	while (!exploreDataHeap.empty())
+	{
+		delete exploreDataHeap.front()->permutation;
+		delete exploreDataHeap.front();
+		exploreDataHeap.pop_front();
+	}
+}
+
+Packer::ExploreData* Packer::AllocateExploreData()
+{
+	if (!exploreDataHeap.empty())
+	{
+		ExploreData* retval = exploreDataHeap.front();
+		exploreDataHeap.pop_front();
+		return retval;
+	}
+	return new ExploreData();
+}
+
+
 
 void PackerTest::Case1()
 {
@@ -467,16 +509,5 @@ void PackerTest::Case2()
 	//packer->CheckFree(Rect(3, 0, 10, 10));
 
 	free(packer);
-}
-
-int _tmain(int argc, _TCHAR* argv[])
-{
-	PackerTest::Case1();
-	PackerTest::Case2();
-
-	char key;
-	std::cin >> key;
-
-	return 0;
 }
 

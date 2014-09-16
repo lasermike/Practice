@@ -6,6 +6,8 @@ using namespace std;
 
 struct Rect
 {
+	int x1, y1, x2, y2;
+
 	Rect()
 	{
 		x1 = y1 = x2 = y2 = 0;
@@ -35,8 +37,6 @@ struct Rect
 		return y2 - y1;
 	}
 
-	int x1, y1, x2, y2;
-
 	const int Size() const
 	{
 		return (x2 - x1) * (y2 - y1);
@@ -56,6 +56,8 @@ public:
 	const int GetWidth() const { return atlasWidth; }
 	const int GetHeight() const { return atlasHeight; }
 
+	void Abort() { abort = true; }
+
 	// Debugging stats
 	void OutputFree();
 	bool CheckFree(Rect rect);
@@ -71,8 +73,8 @@ private:
 		int length;
 		Rect largestHoriz;
 		Rect largestVert;
-		ListOfRectListIterators freeRectsBeingConsumedHoriz;
-		ListOfRectListIterators freeRectsBeingConsumedVert;
+		list<Rect>* freeRectsBeingConsumedHoriz;
+		list<Rect>* freeRectsBeingConsumedVert;
 		list<Rect>::iterator nextFromFreeList;
 	};
 
@@ -88,18 +90,24 @@ private:
 	int requestedWidth;
 	int requestedHeight;
 	queue<ExploreData*> bfsQueue;
+	list<ExploreData*> exploreDataHeap;
+	bool abort;
 
 	bool RequestInternal(int width, int height, Rect& newRect, bool consolidatePass);
-	bool Explore(ExploreData* data, Rect& newRect);
-	bool EvaluateLargest(Rect largestHoriz, ListOfRectListIterators& freeRectsBeingConsumed, Rect& newRect);
-	bool ComputeHorizCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed);
-	bool ComputeVertCaseDimensions(Rect& largest, list<Rect>::iterator rect, ListOfRectListIterators& freeRectsBeingConsumed);
+	bool EvaluatePermuation(ExploreData* data, Rect& newRect);
+	bool EvaluateLargest(Rect largestHoriz, list<Rect>* freeRectsBeingConsumed, Rect& newRect);
+	bool ComputeHorizCaseDimensions(Rect& largest, Rect rect, list<Rect>* freeRectsBeingConsumed);
+	bool ComputeVertCaseDimensions(Rect& largest, Rect rect, list<Rect>* freeRectsBeingConsumed);
 	bool TryCreateSubRect(Rect largest, int width, int height, Rect& newRect);
 	void Clip(Rect clipRect, Rect consumedRect, list<Rect>& newFreeRects);
-	void ListMaintanceAfterCreate(Rect largest, list<Rect> newFreeRects, ListOfRectListIterators& freeRectsBeingConsumed);
+	void ListMaintanceAfterCreate(Rect largest, list<Rect> newFreeRects, list<Rect>* freeRectsBeingConsumed);
 	void RepositionAllocated(Rect& newRect);
 	void PackFreeSpaceDefunct();
 	void ClearBFSQueue();
+	void FreeExploreDataHeap();
+	void EraseFromFreeList(Rect rect);
+
+	ExploreData* AllocateExploreData();
 };
 
 
