@@ -106,7 +106,10 @@ bool Packer::RequestInternal(int width, int height, Rect& newRect, bool consolid
 			ClearBFSQueue();
 
 			if (!consolidatePass)
+			{
 				RepositionAllocated(newRect);
+				//PackFreeSpaceDefunct();
+			}
 			return true;
 		}
 	}
@@ -331,6 +334,7 @@ void Packer::RepositionAllocated(Rect& newRect)
 	}
 }
 
+// This was an idea to consolidate free space
 void Packer::PackFreeSpaceDefunct()
 {
 	// For all pairs of rects, find largest size
@@ -397,9 +401,7 @@ void Packer::PackFreeSpaceDefunct()
 				Clip(largest, *j, newFreeRects);
 				newFreeRects.push_back(largest);
 				ListMaintanceAfterCreate(largestHoriz, newFreeRects, *freeRectsBeingConsumed);
-				return;
 			}
-
 		}
 	}
 }

@@ -4,6 +4,8 @@
 #include "stdafx.h"
 #include "View2.h"
 #include <time.h>
+#include <thread>
+#include <mutex>
 
 // Rect drawing
 #include <objidl.h>
@@ -24,6 +26,8 @@ TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 Packer* _packer = NULL;
 double PCFreq = 0.0;							// Perf
 __int64 CounterStart = 0;						// Perf
+thread* paintThread = NULL;
+mutex paintLock;
 
 // Predeclaration
 void WindowResize(HWND hWnd);
@@ -32,7 +36,10 @@ double GetCounter();
 
 void TestCaseR(HWND hWnd)
 {
-	srand((unsigned)time(NULL));
+	//2
+	unsigned seed = 8;// (unsigned)time(NULL);
+	cout << "Randon seed: " << seed << "\n";
+	srand(seed);
 
 	_packer = new Packer(500, 500);
 	WindowResize(hWnd);
@@ -41,10 +48,18 @@ void TestCaseR(HWND hWnd)
 
 	for (int i = 0; i < 20; i++)
 	{
+		bool retval;
+
 		//int height = (int)((rand() / (float)RAND_MAX) * 20) + 100;
 		int height = (int)((rand() / (float)RAND_MAX) * 100) + 50;
 		int width = (height * 4) / 3; // 4x3
-		if (PackerTest::GetRect(width, height, _packer, newRect))
+
+		{
+			lock_guard<mutex> lock(paintLock);
+			retval = PackerTest::GetRect(width, height, _packer, newRect);
+		}
+
+		if (retval)
 		{
 			// Repaint
 			InvalidateRect(hWnd, NULL, TRUE);
@@ -107,25 +122,19 @@ void TestCase6(HWND hWnd)
 }
 
 
-struct thread_data
+void thread_func(HWND hWnd)
 {
-	HWND _hWnd;
-	thread_data(HWND hWnd) : _hWnd(hWnd) {}
-};
-
-DWORD WINAPI thread_func(LPVOID lpParameter)
-{
-	thread_data *td = (thread_data*)lpParameter;
-	cout << "thread with hWnd = " << td->_hWnd << endl;
+	cout << "thread with hWnd = " << hWnd << endl;
 
 	StartCounter();
-	TestCaseR(td->_hWnd);
+	TestCaseR(hWnd);
 	cout << "Test case time: " << GetCounter() << "\n";
-	return 0;
 }
 
 VOID OnPaint(HDC hdc)
 {
+	lock_guard<mutex> lock(paintLock);
+
 	if (_packer != NULL)
 	{
 		Gdiplus::Graphics graphics(hdc);
@@ -148,6 +157,7 @@ VOID OnPaint(HDC hdc)
 		// Draw allocated
 		count = 0;
 		Gdiplus::SolidBrush blueBrush(Gdiplus::Color(128, 0, 0, 255));
+		//
 		for (auto i = _packer->GetFreeList().begin(); i != _packer->GetFreeList().end(); i++)
 		{
 			graphics.FillRectangle(&blueBrush, i->x1 + drawMargin, i->y1 + drawMargin,
@@ -309,7 +319,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		PostMessage(hWnd, WM_CREATERECTS, 0, 0);
 		break;
 	case WM_CREATERECTS:
-		CreateThread(NULL, 0, thread_func, new thread_data(hWnd), 0, 0);
+		paintThread = new thread(thread_func, hWnd);
 		break;
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);
@@ -321,6 +331,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
 		case IDM_EXIT:
+
 			DestroyWindow(hWnd);
 			break;
 		default:
@@ -335,6 +346,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_DESTROY:
+		if (paintThread)
+			paintThread->join();
 		PostQuitMessage(0);
 		break;
 	default:
