@@ -23,20 +23,16 @@ Packer::Packer(int width, int height)
 	abort = false;
 }
 
-void Packer::OutputFree()
+Packer::~Packer()
 {
-	cout << "Free list\n";
-	for (list<Rect>::iterator freeRect = freeList.begin(); freeRect != freeList.end(); freeRect++)
-	{
-cout << "  rect(" << freeRect->x1 << ", " << freeRect->y1 << ", " << freeRect->x2 << ", " << freeRect->y2 << ")\n";
-	}
+	ClearBFSQueue();
+	FreeExploreDataHeap();
 }
 
 bool Packer::Request(int width, int height, Rect& newRect)
 {
 	bool retval = RequestInternal(width, height, newRect, false);
 	ClearBFSQueue();
-	FreeExploreDataHeap();
 
 	return retval;
 }
@@ -446,16 +442,24 @@ bool Packer::CheckFree(Rect rect)
 	return false;
 }
 
+void Packer::OutputFree()
+{
+	cout << "Free list\n";
+	for (list<Rect>::iterator freeRect = freeList.begin(); freeRect != freeList.end(); freeRect++)
+	{
+		cout << "  rect(" << freeRect->x1 << ", " << freeRect->y1 << ", " << freeRect->x2 << ", " << freeRect->y2 << ")\n";
+	}
+}
+
 void Packer::ClearBFSQueue()
 {
 	// Clear queue 
 	while (!bfsQueue.empty())
 	{
-		delete bfsQueue.front();
+		exploreDataHeap.push_back(bfsQueue.front());
 		bfsQueue.pop();
 	}
 }
-
 
 void Packer::FreeExploreDataHeap()
 {
@@ -463,6 +467,8 @@ void Packer::FreeExploreDataHeap()
 	while (!exploreDataHeap.empty())
 	{
 		delete exploreDataHeap.front()->permutation;
+		delete exploreDataHeap.front()->freeRectsBeingConsumedHoriz;
+		delete exploreDataHeap.front()->freeRectsBeingConsumedVert;
 		delete exploreDataHeap.front();
 		exploreDataHeap.pop_front();
 	}
@@ -472,9 +478,10 @@ Packer::ExploreData* Packer::AllocateExploreData()
 {
 	if (!exploreDataHeap.empty())
 	{
-		ExploreData* retval = exploreDataHeap.front();
+		ExploreData* data = exploreDataHeap.front();
 		exploreDataHeap.pop_front();
-		return retval;
+		delete data->permutation;
+		return data;
 	}
 	return new ExploreData();
 }

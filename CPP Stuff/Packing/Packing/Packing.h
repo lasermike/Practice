@@ -50,6 +50,7 @@ class Packer
 {
 public:
 	Packer(int width, int height);
+	~Packer();
 
 	bool Request(int width, int height, Rect& newRect);
 
